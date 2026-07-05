@@ -1,0 +1,2 @@
+# predictiveEdge
+stock trading application
