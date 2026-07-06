@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: predictiveedge-postgres
+    environment:
+      POSTGRES_DB: predictiveedge
+      POSTGRES_USER: predictiveedge
+      POSTGRES_PASSWORD: predictiveedge
+    ports:
+      - "5432:5432"
+    volumes:
+      - predictiveedge-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U predictiveedge -d predictiveedge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: predictiveedge-adminer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+
+volumes:
+  predictiveedge-postgres-data:

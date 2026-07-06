@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS system_health_marker (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);

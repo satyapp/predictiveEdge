@@ -1,0 +1,30 @@
+package com.predictiveedge.api.controller;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
+
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class HealthController {
+
+    private final HealthEndpoint healthEndpoint;
+
+    public HealthController(HealthEndpoint healthEndpoint) {
+        this.healthEndpoint = healthEndpoint;
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> health() {
+        return ResponseEntity.ok(Map.of(
+                "status", healthEndpoint.health().getStatus().getCode(),
+                "timestamp", OffsetDateTime.now().toString(),
+                "service", "predictiveEdge"
+        ));
+    }
+}
