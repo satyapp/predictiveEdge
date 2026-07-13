@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.vscode
+**/.settings
+**/target
+**/node_modules
+**/dist
+docs
+*.log
+.env
+*API key*.txt

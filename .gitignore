@@ -1,2 +1,36 @@
-/backend/predictiveedge-parent/.settings
-/.settings
+# Build outputs
+**/target/
+**/dist/
+**/node_modules/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*API key*.txt
+*.pem
+*.key
+
+# IDE and operating-system files
+.settings/
+**/.settings/
+.project
+**/.project
+.classpath
+**/.classpath
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and local caches
+*.log
+.mvn-cache/
+.pnpm-store/
+
+# Local architecture bundles retained as reference material
+docs/architecture/*.zip
+docs/architecture/PredictiveEdge-Phase1-v1.0/
+docs/architecture/PredictiveEdge_Phase1_Deliverables/
+
+*.tsbuildinfo

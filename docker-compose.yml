@@ -1,29 +1,58 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: predictiveedge-postgres
     environment:
-      POSTGRES_DB: predictiveedge
-      POSTGRES_USER: predictiveedge
-      POSTGRES_PASSWORD: predictiveedge
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-predictiveedge}
+      POSTGRES_USER: ${POSTGRES_USER:-predictiveedge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-predictiveedge-local}
     volumes:
       - predictiveedge-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U predictiveedge -d predictiveedge"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  adminer:
-    image: adminer:latest
-    container_name: predictiveedge-adminer
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-predictiveedge-local}", "--appendonly", "yes"]
+    volumes:
+      - predictiveedge-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-predictiveedge-local}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  platform-core:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.platform-core
+    environment:
+      PE_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-predictiveedge}
+      PE_DATABASE_USERNAME: ${POSTGRES_USER:-predictiveedge}
+      PE_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-predictiveedge-local}
+      PE_REDIS_HOST: redis
+      PE_REDIS_PORT: 6379
+      PE_REDIS_PASSWORD: ${REDIS_PASSWORD:-predictiveedge-local}
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
-      - "8081:8080"
+      - "${API_PORT:-8080}:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    depends_on:
+      platform-core:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:80"
 
 volumes:
   predictiveedge-postgres-data:
+  predictiveedge-redis-data:

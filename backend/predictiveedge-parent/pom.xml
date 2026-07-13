@@ -25,6 +25,7 @@
         <module>predictiveedge-infrastructure</module>
         <module>predictiveedge-data</module>
         <module>predictiveedge-batch</module>
+        <module>predictiveedge-platform-core</module>
     </modules>
 
     <properties>

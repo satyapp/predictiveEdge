@@ -1,78 +1,74 @@
 # PredictiveEdge
 
-PredictiveEdge is a production-ready enterprise starter built with Java 21 and Spring Boot 3.5.x using a Maven multi-module architecture.
+PredictiveEdge is an early-stage trading platform built with Java 21, Spring Boot, React, PostgreSQL, and Redis. The first deployable release is **Platform Core**: the identity boundary, platform health API, database migration baseline, and web shell.
 
-## Repository structure
+The AI and trade-lifecycle engines remain roadmap items. They are intentionally excluded from the first release until executable modules and tests exist.
 
-- `backend/predictiveedge-parent`
-  - `predictiveedge-common`
-  - `predictiveedge-domain`
-  - `predictiveedge-api`
-- `docker`
-- `docs`
-- `infrastructure`
-- `frontend`
-- `sample-data`
-- `postman`
-- `tools`
+## First release
 
-## Technology stack
+The deployable stack contains:
 
-- Java 21
-- Spring Boot 3.5.x
-- Spring Data JPA
-- Spring Boot Actuator
-- Flyway
-- PostgreSQL
-- Lombok
-- Docker Compose
+- `platform-core`: Spring Boot application on port `8080`
+- `web`: React application served by Nginx on port `3000`
+- `postgres`: authoritative relational store
+- `redis`: cache and short-lived state store
 
-## Backend modules
+Public checks:
 
-- `predictiveedge-common`: shared utilities and cross-cutting contracts
-- `predictiveedge-domain`: clean domain model and business abstractions
-- `predictiveedge-api`: Spring Boot application, REST API, persistence, Flyway migration, and actuator configuration
+- Web: <http://localhost:3000>
+- API health: <http://localhost:8080/api/health>
+- Actuator health: <http://localhost:8080/actuator/health>
 
-## Run locally
+All application routes other than health checks are denied until the identity flows are implemented.
 
-### 1. Start infrastructure
+## Build and test
+
+Prerequisites: Java 21, Maven 3.9+, Node.js 22+, and Docker.
 
 ```powershell
-docker compose up -d
+mvn clean verify
+
+cd frontend/apps/web/predictiveedge-web
+npm ci
+npm test
+npm run build
 ```
 
-### 2. Build the backend
+## Run the release stack
+
+For local development, the Compose file supplies non-production fallback passwords. To choose your own values:
 
 ```powershell
-cd backend/predictiveedge-parent
-mvn clean test
+Copy-Item .env.example .env
+# Edit .env before starting the stack.
 ```
 
-If Maven is not installed globally, use the Maven Wrapper once it is added to the project.
-
-### 3. Run the API
+Build and start everything:
 
 ```powershell
-cd backend/predictiveedge-parent/predictiveedge-api
-mvn spring-boot:run
+docker compose up --build -d
+docker compose ps
 ```
 
-### 4. Check health
+Stop the stack without deleting database volumes:
 
-- Application health: `http://localhost:8080/api/health`
-- Actuator health: `http://localhost:8080/actuator/health`
-- Adminer: `http://localhost:8081`
+```powershell
+docker compose down
+```
 
-## Configuration
+Production deployments must inject PostgreSQL and Redis credentials through the deployment environment or secret store. Never commit `.env`, broker credentials, signing keys, or API keys.
 
-The default `application.yml` expects PostgreSQL on `localhost:5432` with:
+## Repository layout
 
-- database: `predictiveedge`
-- username: `predictiveedge`
-- password: `predictiveedge`
+```text
+backend/predictiveedge-parent/   Java modules and Platform Core application
+frontend/apps/web/               React web application
+docker/                          Release container definitions
+docs/                            Architecture and design material
+.github/workflows/ci.yml         Verified first-release CI pipeline
+docker-compose.yml               Local release stack
+```
 
-## Notes
+## Release boundary
 
-- The project follows Clean Architecture by keeping the domain and common modules independent of Spring Boot runtime concerns.
-- Flyway migration files live under `backend/predictiveedge-parent/predictiveedge-api/src/main/resources/db/migration`.
-- A Maven Wrapper should be generated or copied into `backend/predictiveedge-parent` for fully self-contained builds.
+This release proves reproducible builds, database migrations, health reporting, secure route defaults, and container deployment. Login, user persistence, broker integration, AI predictions, and trade execution are not yet claimed as complete.
