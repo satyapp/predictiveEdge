@@ -5,6 +5,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-predictiveedge}
       POSTGRES_USER: ${POSTGRES_USER:-predictiveedge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-predictiveedge-local}
+    ports:
+      - "5432:5432"
     volumes:
       - predictiveedge-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -35,6 +37,16 @@ services:
       PE_REDIS_HOST: redis
       PE_REDIS_PORT: 6379
       PE_REDIS_PASSWORD: ${REDIS_PASSWORD:-predictiveedge-local}
+      PE_IDENTITY_OTP_SECRET: ${PE_IDENTITY_OTP_SECRET:-local-only-change-this-otp-secret-before-production}
+      PE_IDENTITY_ACCESS_TOKEN_SECRET: ${PE_IDENTITY_ACCESS_TOKEN_SECRET:-local-only-change-this-access-token-secret}
+      PE_EMAIL_PROVIDER: ${PE_EMAIL_PROVIDER:-ses}
+      PE_SES_REGION: ${PE_SES_REGION:-ap-south-1}
+      PE_SES_FROM_ADDRESS: ${PE_SES_FROM_ADDRESS:-no-reply@predictiveedge.local}
+      PE_SMS_PROVIDER: ${PE_SMS_PROVIDER:-mock}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${PE_SES_REGION:-ap-south-1}
     depends_on:
       postgres:
         condition: service_healthy

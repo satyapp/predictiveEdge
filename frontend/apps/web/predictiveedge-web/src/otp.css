@@ -1,0 +1,47 @@
+.otp-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.otp-actions .secondary {
+  width: 100%;
+}
+
+.mock-otp {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #7aa9d6;
+  border-radius: 8px;
+  color: #174b7a;
+  background: #eef6ff;
+  font-size: 13px;
+}
+
+.mock-otp strong {
+  margin-left: 4px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: .14em;
+}
+
+.resend {
+  padding: 0 15px;
+  border: 0;
+  color: var(--blue);
+  background: transparent;
+  font-weight: 700;
+}
+
+.resend:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #176b61;
+  background: #eaf8f5;
+  font-size: 12px;
+}

@@ -3,5 +3,9 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>org.predictiveedge</groupId><artifactId>predictiveedge-platform-core</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../predictiveedge-platform-core</relativePath></parent>
   <artifactId>identity-application</artifactId>
-  <dependencies><dependency><groupId>org.predictiveedge</groupId><artifactId>identity-domain</artifactId><version>${project.version}</version></dependency></dependencies>
+  <dependencies>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-domain</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+  </dependencies>
 </project>

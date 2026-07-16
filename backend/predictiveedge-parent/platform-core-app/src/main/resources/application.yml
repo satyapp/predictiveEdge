@@ -16,6 +16,19 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+predictiveedge:
+  identity:
+    otp-secret: ${PE_IDENTITY_OTP_SECRET:local-only-change-this-otp-secret-before-production}
+    access-token-secret: ${PE_IDENTITY_ACCESS_TOKEN_SECRET:local-only-change-this-access-token-secret}
+    otp-minutes: ${PE_IDENTITY_OTP_MINUTES:5}
+    otp-max-attempts: ${PE_IDENTITY_OTP_MAX_ATTEMPTS:5}
+    access-token-minutes: ${PE_IDENTITY_ACCESS_TOKEN_MINUTES:15}
+    email:
+      provider: ${PE_EMAIL_PROVIDER:ses}
+      from-address: ${PE_SES_FROM_ADDRESS:no-reply@predictiveedge.local}
+      region: ${PE_SES_REGION:ap-south-1}
+    sms:
+      provider: ${PE_SMS_PROVIDER:mock}
 management:
   endpoint:
     health:

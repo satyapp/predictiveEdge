@@ -11,7 +11,9 @@ import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServic
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import org.predictiveedge.identity.application.IdentityService;
 import org.predictiveedge.identity.api.PlatformSecurityConfiguration;
 
 @WebMvcTest(PlatformHealthController.class)
@@ -21,6 +23,9 @@ class PlatformHealthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private IdentityService identityService;
 
     @Test
     void healthIsPublicAndReportsTheService() throws Exception {
