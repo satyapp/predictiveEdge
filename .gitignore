@@ -34,3 +34,4 @@ docs/architecture/PredictiveEdge-Phase1-v1.0/
 docs/architecture/PredictiveEdge_Phase1_Deliverables/
 
 *.tsbuildinfo
+/.tmp

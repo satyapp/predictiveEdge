@@ -19,6 +19,14 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <modules>
+    <module>../broker-domain</module>
+    <module>../broker-spi</module>
+    <module>../broker-paper-adapter</module>
+    <module>../broker-zerodha-adapter</module>
+    <module>../broker-backtest</module>
+    <module>../broker-connection-application</module>
+    <module>../broker-connection-infrastructure</module>
+    <module>../broker-api</module>
     <module>../identity-domain</module>
     <module>../identity-application</module>
     <module>../identity-infrastructure</module>

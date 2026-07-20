@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.predictiveedge</groupId><artifactId>predictiveedge-platform-core</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../predictiveedge-platform-core</relativePath></parent>
+  <artifactId>broker-zerodha-adapter</artifactId>
+  <dependencies>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-spi</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+  </dependencies>
+</project>

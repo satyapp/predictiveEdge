@@ -29,6 +29,16 @@ predictiveedge:
       region: ${PE_SES_REGION:ap-south-1}
     sms:
       provider: ${PE_SMS_PROVIDER:mock}
+  broker:
+    credential-key: ${PE_BROKER_CREDENTIAL_KEY:local-only-change-this-broker-credential-key}
+    connection-state-minutes: ${PE_BROKER_CONNECTION_STATE_MINUTES:10}
+    browser-lease-seconds: ${PE_BROKER_BROWSER_LEASE_SECONDS:120}
+    browser-close-grace-seconds: ${PE_BROKER_BROWSER_CLOSE_GRACE_SECONDS:30}
+    lease-sweep-milliseconds: ${PE_BROKER_LEASE_SWEEP_MILLISECONDS:15000}
+    web-base-url: ${PE_WEB_BASE_URL:http://localhost:3000/}
+    zerodha:
+      api-key: ${PE_ZERODHA_API_KEY:}
+      api-secret: ${PE_ZERODHA_API_SECRET:}
 management:
   endpoint:
     health:

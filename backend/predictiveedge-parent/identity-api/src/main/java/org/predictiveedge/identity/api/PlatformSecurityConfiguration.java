@@ -21,8 +21,10 @@ public class PlatformSecurityConfiguration {
                                 "/api/identity/v1/auth/verify-email",
                                 "/api/identity/v1/auth/verify-mobile",
                                 "/api/identity/v1/auth/verification/otp/resend",
-                                "/api/identity/v1/auth/login").permitAll()
+                                "/api/identity/v1/auth/login",
+                                "/api/broker/v1/zerodha/callback").permitAll()
                         .requestMatchers("/api/identity/v1/me", "/api/identity/v1/auth/logout").authenticated()
+                        .requestMatchers("/api/broker/v1/**").authenticated()
                         .anyRequest().denyAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

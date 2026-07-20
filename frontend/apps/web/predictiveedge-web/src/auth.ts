@@ -27,6 +27,23 @@ export type AuthSession = {
   user: User;
 };
 
+const SESSION_KEY = 'predictiveedge.auth.session';
+
+export function loadStoredSession(): AuthSession | undefined {
+  try {
+    const value = sessionStorage.getItem(SESSION_KEY);
+    return value ? JSON.parse(value) as AuthSession : undefined;
+  } catch { return undefined; }
+}
+
+export function storeSession(session: AuthSession) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearStoredSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
 type ErrorPayload = { message?: string; fieldErrors?: { field: string; message?: string }[] };
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
