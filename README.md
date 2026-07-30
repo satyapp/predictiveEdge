@@ -1,6 +1,6 @@
 # PredictiveEdge
 
-PredictiveEdge is an early-stage trading platform built with Java 21, Spring Boot, React, PostgreSQL, and Redis. The first deployable release is **Platform Core**: the identity boundary, platform health API, database migration baseline, and web shell.
+PredictiveEdge is an early-stage trading platform built with Java 21, Spring Boot, React, PostgreSQL, Redis, and Apache Kafka. The first deployable release is **Platform Core**: the identity boundary, platform health API, database migration baseline, event backbone bootstrap, and web shell.
 
 The AI and trade-lifecycle engines remain roadmap items. They are intentionally excluded from the first release until executable modules and tests exist.
 
@@ -12,6 +12,7 @@ The deployable stack contains:
 - `web`: React application served by Nginx on port `3000`
 - `postgres`: authoritative relational store
 - `redis`: cache and short-lived state store
+- `kafka`: local KRaft event broker with versioned PredictiveEdge topic families
 
 Public checks:
 
@@ -56,7 +57,15 @@ Stop the stack without deleting database volumes:
 docker compose down
 ```
 
-Production deployments must inject PostgreSQL and Redis credentials through the deployment environment or secret store. Never commit `.env`, broker credentials, signing keys, or API keys.
+Production deployments must inject PostgreSQL, Redis, and Kafka connection/security
+settings through the deployment environment or secret store. The Compose Kafka
+listener is plaintext and intended only for local development. Never commit
+`.env`, broker credentials, signing keys, or API keys.
+
+When running Platform Core directly, Kafka defaults to `localhost:9092`. Topic
+provisioning is disabled by default and is enabled explicitly by local Compose.
+Production topic partition and replication settings must be managed by the
+deployment platform rather than application startup.
 
 ## Repository layout
 

@@ -10,6 +10,29 @@ spring:
       host: ${PE_REDIS_HOST:localhost}
       port: ${PE_REDIS_PORT:6379}
       password: ${PE_REDIS_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${PE_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    client-id: ${PE_KAFKA_CLIENT_ID:predictiveedge-platform-core}
+    admin:
+      fail-fast: ${PE_KAFKA_ADMIN_FAIL_FAST:false}
+    consumer:
+      group-id: ${PE_KAFKA_CONSUMER_GROUP:predictiveedge-platform-core}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: true
   jpa:
     open-in-view: false
     hibernate:
@@ -17,6 +40,10 @@ spring:
   flyway:
     enabled: true
 predictiveedge:
+  kafka:
+    provision-topics: ${PE_KAFKA_PROVISION_TOPICS:false}
+    partitions: ${PE_KAFKA_TOPIC_PARTITIONS:3}
+    replication-factor: ${PE_KAFKA_TOPIC_REPLICATION_FACTOR:1}
   identity:
     otp-secret: ${PE_IDENTITY_OTP_SECRET:local-only-change-this-otp-secret-before-production}
     access-token-secret: ${PE_IDENTITY_ACCESS_TOKEN_SECRET:local-only-change-this-access-token-secret}
