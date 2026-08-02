@@ -95,4 +95,13 @@ public record FeatureValue(
                 last.observedThrough(), computedAt, finality, FeatureReadiness.READY,
                 definition.parameters(), definition.codeVersion(), manifest.contentHash());
     }
+
+    static FeatureValue readyComposite(FeatureDefinition definition, ObservationSubject subject,
+            BarTimeframe timeframe, BigDecimal rawValue, Instant valueTime, Instant observedFrom,
+            Instant observedThrough, Instant availableAt, BarFinalityState finality, ContentHash manifestHash) {
+        Objects.requireNonNull(definition); Objects.requireNonNull(rawValue);
+        return new FeatureValue(definition.ref(), subject, timeframe, definition.numericPolicy().round(rawValue),
+                definition.outputUnit(), valueTime, observedFrom, observedThrough, availableAt, finality,
+                FeatureReadiness.READY, definition.parameters(), definition.codeVersion(), manifestHash);
+    }
 }

@@ -10,12 +10,16 @@ final class FeatureCalculatorSupport {
     }
 
     static void validate(FeatureDefinition definition, FeatureDefinitionRef expected, String parameter, int value) {
-        if (!definition.ref().equals(expected)) {
-            throw new IllegalArgumentException("Feature definition does not match calculator binding");
-        }
+        validate(definition, expected);
         String configured = definition.parameters().get(parameter);
         if (configured == null || Integer.parseInt(configured) != value) {
             throw new IllegalArgumentException("Feature parameter does not match calculator binding: " + parameter);
+        }
+    }
+
+    static void validate(FeatureDefinition definition, FeatureDefinitionRef expected) {
+        if (!definition.ref().equals(expected)) {
+            throw new IllegalArgumentException("Feature definition does not match calculator binding");
         }
     }
 
