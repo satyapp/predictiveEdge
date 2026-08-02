@@ -4,6 +4,7 @@
   <parent><groupId>org.predictiveedge</groupId><artifactId>predictiveedge-platform-core</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../predictiveedge-platform-core</relativePath></parent>
   <artifactId>platform-core-app</artifactId>
   <dependencies>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>platform-eventing-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-api</artifactId><version>${project.version}</version></dependency>

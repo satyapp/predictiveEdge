@@ -40,6 +40,14 @@ spring:
   flyway:
     enabled: true
 predictiveedge:
+  eventing:
+    dispatch:
+      enabled: ${PE_EVENTING_DISPATCH_ENABLED:false}
+      batch-size: ${PE_EVENTING_DISPATCH_BATCH_SIZE:100}
+      fixed-delay: ${PE_EVENTING_DISPATCH_FIXED_DELAY:PT1S}
+      lease-duration: ${PE_EVENTING_DISPATCH_LEASE_DURATION:PT30S}
+      retry-delay: ${PE_EVENTING_DISPATCH_RETRY_DELAY:PT10S}
+      publish-timeout: ${PE_EVENTING_DISPATCH_PUBLISH_TIMEOUT:PT10S}
   kafka:
     provision-topics: ${PE_KAFKA_PROVISION_TOPICS:false}
     partitions: ${PE_KAFKA_TOPIC_PARTITIONS:3}

@@ -39,20 +39,25 @@ public final class BacktestEngine {
         PaperQuoteBook quotes = new PaperQuoteBook();
         PaperBrokerAdapter paper = new PaperBrokerAdapter(startingCash, quotes, clock);
         List<BrokerOrder> trades = new ArrayList<>();
+        BacktestDecision pendingDecision = null;
+        int pendingSignalIndex = -1;
 
         for (int index = 0; index < candles.size(); index++) {
             Candle candle = candles.get(index);
             clock.moveTo(candle.timestamp());
             quotes.update(candle.instrument(), candle.close());
-            BacktestDecision decision = strategy.decide(new BacktestStep(index, candle, paper.account(context)));
-            if (decision.action() == BacktestDecision.Action.HOLD) {
-                continue;
+
+            if (pendingDecision != null) {
+                trades.add(execute(
+                        paper, context, candle, pendingDecision, pendingSignalIndex));
             }
-            OrderSide side = decision.action() == BacktestDecision.Action.BUY ? OrderSide.BUY : OrderSide.SELL;
-            UUID orderId = UUID.nameUUIDFromBytes(
-                    (index + ":" + candle.timestamp()).getBytes(StandardCharsets.UTF_8));
-            trades.add(paper.placeOrder(context, new OrderRequest(
-                    orderId, candle.instrument(), side, OrderType.MARKET, decision.quantity(), null)));
+
+            BacktestDecision decision = strategy.decide(new BacktestStep(index, candle, paper.account(context)));
+            if (decision == null) {
+                throw new IllegalArgumentException("Strategy decision is required");
+            }
+            pendingDecision = decision.action() == BacktestDecision.Action.HOLD ? null : decision;
+            pendingSignalIndex = index;
         }
 
         Candle last = candles.getLast();
@@ -64,6 +69,19 @@ public final class BacktestEngine {
                 .divide(startingCash, 6, RoundingMode.HALF_UP);
         return new BacktestResult(startingCash, account.availableCash(), finalEquity,
                 returnPercent, account.positions(), trades);
+    }
+
+    private static BrokerOrder execute(
+            PaperBrokerAdapter paper,
+            BrokerContext context,
+            Candle executionCandle,
+            BacktestDecision decision,
+            int signalIndex) {
+        OrderSide side = decision.action() == BacktestDecision.Action.BUY ? OrderSide.BUY : OrderSide.SELL;
+        UUID orderId = UUID.nameUUIDFromBytes(
+                (signalIndex + ":" + executionCandle.timestamp()).getBytes(StandardCharsets.UTF_8));
+        return paper.placeOrder(context, new OrderRequest(
+                orderId, executionCandle.instrument(), side, OrderType.MARKET, decision.quantity(), null));
     }
 
     private static void validateCandles(List<Candle> candles) {

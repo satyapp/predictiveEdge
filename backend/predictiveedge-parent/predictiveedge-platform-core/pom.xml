@@ -19,6 +19,9 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <modules>
+    <module>../platform-eventing-contracts</module>
+    <module>../platform-eventing-application</module>
+    <module>../platform-eventing-infrastructure</module>
     <module>../broker-domain</module>
     <module>../broker-spi</module>
     <module>../broker-paper-adapter</module>

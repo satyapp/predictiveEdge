@@ -21,7 +21,8 @@ class BacktestEngineTest {
     @Test
     void replaysStrategyOrdersThroughPaperTrading() {
         var engine = new BacktestEngine(new BigDecimal("1000"));
-        List<Candle> candles = List.of(candle(0, "100"), candle(1, "110"), candle(2, "120"));
+        List<Candle> candles = List.of(
+                candle(0, "100"), candle(1, "110"), candle(2, "120"), candle(3, "130"));
 
         BacktestResult result = engine.run(
                 BrokerContext.withoutCredentials(UUID.randomUUID(), "backtest"),
@@ -33,10 +34,30 @@ class BacktestEngineTest {
                 });
 
         assertThat(result.trades()).hasSize(2);
-        assertThat(result.trades().getFirst().createdAt()).isEqualTo(candles.getFirst().timestamp());
+        assertThat(result.trades().getFirst().createdAt()).isEqualTo(candles.get(1).timestamp());
+        assertThat(result.trades().getFirst().averageFillPrice()).isEqualByComparingTo("110");
+        assertThat(result.trades().getLast().createdAt()).isEqualTo(candles.get(3).timestamp());
+        assertThat(result.trades().getLast().averageFillPrice()).isEqualByComparingTo("130");
         assertThat(result.finalCash()).isEqualByComparingTo("1100");
         assertThat(result.finalEquity()).isEqualByComparingTo("1100");
         assertThat(result.totalReturnPercent()).isEqualByComparingTo("10.000000");
+        assertThat(result.finalPositions()).isEmpty();
+    }
+
+    @Test
+    void doesNotFillACompletedCandleDecisionOnTheSameCandle() {
+        var engine = new BacktestEngine(new BigDecimal("1000"));
+        List<Candle> candles = List.of(candle(0, "100"), candle(1, "110"));
+
+        BacktestResult result = engine.run(
+                BrokerContext.withoutCredentials(UUID.randomUUID(), "backtest"),
+                candles,
+                step -> step.index() == 1
+                        ? BacktestDecision.buy(BigDecimal.ONE)
+                        : BacktestDecision.hold());
+
+        assertThat(result.trades()).isEmpty();
+        assertThat(result.finalCash()).isEqualByComparingTo("1000");
         assertThat(result.finalPositions()).isEmpty();
     }
 
