@@ -42,6 +42,10 @@ public final class TradeGuardianService {
         return monitoringCase;
     }
 
+    public TradeMonitoringCase monitoringCase(UUID traderId, UUID monitoringCaseId) {
+        return ownedCase(traderId, monitoringCaseId);
+    }
+
     public TradeMonitoringCase suspendMonitoring(UUID traderId, UUID monitoringCaseId, String reason) {
         TradeMonitoringCase current = ownedCase(traderId, monitoringCaseId);
         return replace(current, current.suspend(reason, clock.instant()), Type.MONITORING_SUSPENDED);

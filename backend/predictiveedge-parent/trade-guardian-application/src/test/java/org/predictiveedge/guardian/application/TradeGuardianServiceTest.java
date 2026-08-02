@@ -57,6 +57,17 @@ class TradeGuardianServiceTest {
     }
 
     @Test
+    void returnsOnlyTheOwningTradersMonitoringCase() {
+        TradeMonitoringCase registered = service.registerManualTrade(registration("recommendation-1"));
+
+        assertThat(service.monitoringCase(TRADER_ID, registered.monitoringCaseId())).isEqualTo(registered);
+        assertThatThrownBy(() -> service.monitoringCase(UUID.randomUUID(), registered.monitoringCaseId()))
+                .isInstanceOfSatisfying(TradeGuardianFailure.class,
+                        failure -> assertThat(failure.code()).isEqualTo(
+                                TradeGuardianFailure.Code.MONITORING_CASE_NOT_FOUND));
+    }
+
+    @Test
     void traderCanSuspendResumeAndCompleteTheRegisteredTrade() {
         TradeMonitoringCase registered = service.registerManualTrade(registration("recommendation-1"));
         TradeMonitoringCase suspended = service.suspendMonitoring(TRADER_ID, registered.monitoringCaseId(),

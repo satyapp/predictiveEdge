@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "org.predictiveedge.identity.api")
 public class IdentityExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> validation(MethodArgumentNotValidException failure, HttpServletRequest request) {

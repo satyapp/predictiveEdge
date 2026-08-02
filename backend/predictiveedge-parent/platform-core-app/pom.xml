@@ -6,6 +6,7 @@
   <dependencies>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>platform-eventing-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>trade-guardian-infrastructure</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>trade-guardian-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-api</artifactId><version>${project.version}</version></dependency>
