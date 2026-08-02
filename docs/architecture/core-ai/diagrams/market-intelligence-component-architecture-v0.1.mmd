@@ -1,0 +1,87 @@
+flowchart LR
+    classDef external fill:#F7F8FA,stroke:#667085,color:#101828
+    classDef app fill:#EAF2F8,stroke:#2E74B5,color:#0B2545
+    classDef domain fill:#E8F5EE,stroke:#238636,color:#123B21
+    classDef store fill:#FFF6E5,stroke:#B7791F,color:#5B3A00
+    classDef consumer fill:#F3E8FF,stroke:#7E57C2,color:#32145F
+    classDef current fill:#DDF4FF,stroke:#0969DA,stroke-width:3px,color:#0B2545
+
+    subgraph Sources["Canonical source and reference adapters"]
+        Feed["Trades / L1 quotes / depth / bars / indices"]
+        Events["Corporate actions / disclosures / financials / ownership / news / macro"]
+        Calendar["Exchange calendar and sessions"]
+        Master["Instrument master and universe"]
+        Clock["Live or virtual EvaluationClock"]
+    end
+
+    subgraph MI["Market Intelligence bounded context"]
+        direction LR
+        subgraph Application["Application orchestration"]
+            Evaluate["EvaluateMarketContext"]
+            Replay["Replay / as-of query"]
+            Ports["Observation, calendar, master and feature ports"]
+        end
+
+        subgraph Domain["Deterministic causal intelligence"]
+            Selector["Point-in-time revision selector"]:::current
+            Manifest["Content-addressed Input Manifest"]:::current
+            Quality["Quality gates and degraded-mode policy"]
+            Bars["Session-aware bars, finality and corrections"]
+            Features["Versioned causal Feature Engine"]
+            Dimensions["Trend / volatility / liquidity / breadth / sector"]
+            Fusion["Evidence fusion and contradiction"]
+            Confidence["Decomposed confidence and caps"]
+            Compose["MarketContext composer and materiality"]
+        end
+    end
+
+    subgraph Persistence["Immutable truth and reliable publication"]
+        Runs[("Analysis runs and manifests")]
+        Evidence[("Features, evidence and assessments")]
+        Contexts[("Immutable Market Context versions")]
+        Latest[("Replaceable latest projection")]
+        Outbox[("Transactional outbox")]
+        Kafka["Kafka business-event plane"]
+    end
+
+    subgraph Consumers["Read-only downstream intelligence consumers"]
+        Chart["Chart Intelligence"]
+        Scanner["Scanner Intelligence"]
+        Strategy["Strategy Intelligence"]
+        Decision["Decision Intelligence"]
+        Risk["Risk / Portfolio Intelligence"]
+        Guardian["Trade Guardian"]
+    end
+
+    Feed --> Ports
+    Events --> Ports
+    Calendar --> Ports
+    Master --> Ports
+    Clock --> Evaluate
+    Evaluate --> Selector
+    Replay --> Selector
+    Ports --> Selector
+    Selector --> Manifest --> Quality --> Bars --> Features --> Dimensions --> Fusion --> Confidence --> Compose
+    Manifest --> Runs
+    Quality --> Runs
+    Features --> Evidence
+    Dimensions --> Evidence
+    Compose --> Runs
+    Compose --> Contexts
+    Compose --> Latest
+    Compose --> Outbox --> Kafka
+    Kafka --> Chart
+    Kafka --> Scanner
+    Kafka --> Strategy
+    Kafka --> Decision
+    Kafka --> Risk
+    Kafka --> Guardian
+
+    class Feed,Events,Calendar,Master,Clock external
+    class Evaluate,Replay,Ports app
+    class Quality,Bars,Features,Dimensions,Fusion,Confidence,Compose domain
+    class Runs,Evidence,Contexts,Latest,Outbox,Kafka store
+    class Chart,Scanner,Strategy,Decision,Risk,Guardian consumer
+
+    note["Authority boundary: Market Intelligence describes the market. It never recommends, sizes, or executes a trade."]:::external
+    Compose -. governed Market Context only .-> note

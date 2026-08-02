@@ -1,0 +1,64 @@
+sequenceDiagram
+    autonumber
+    actor Caller as CORE AI / Scheduler
+    participant Intent as Trader Intent Registry
+    participant MI as MI Application
+    participant Clock as EvaluationClock
+    participant Refs as Calendar + Instrument Master
+    participant Obs as ObservationQueryPort
+    participant Causal as Causal Selector + Manifest
+    participant Quality as Quality Gate
+    participant Bars as Bar / Finality Engine
+    participant Features as Feature Engine
+    participant Evidence as Dimension + Fusion Engines
+    participant Context as Context Composer
+    participant DB as MI Repository
+    participant Outbox as Transactional Outbox
+    participant Bus as Kafka Event Plane
+    participant Consumers as CORE AI Consumers
+
+    Caller->>Intent: Resolve active immutable intent reference
+    Caller->>MI: Evaluate(contextKey, intentRef, analysisCutoff, knowledgeCutoff)
+    MI->>Clock: Confirm deterministic evaluation time
+    MI->>Refs: Resolve calendar, session, mappings, universe and active versions as known at cutoffs
+    MI->>Obs: Query canonical observation revisions eligible for requested scope
+    Obs-->>MI: Revisioned observations with eventTime, receivedAt and usableAt
+    MI->>Causal: Select latest revision known at both cutoffs
+    Causal-->>MI: Ordered content-addressed Input Manifest
+    MI->>Quality: Evaluate hard gates, freshness, gaps, coverage and entitlement
+
+    alt Invalid intent, lineage, session or mandatory quality gate
+        Quality-->>MI: BLOCKED / SUSPENDED with explicit issues
+        MI->>DB: Persist immutable abstained AnalysisRun
+        MI-->>Caller: NO_CONTEXT with reason codes and manifest hash
+    else Eligible or governed degraded mode
+        Quality-->>MI: QualityAssessment and caps
+        MI->>Bars: Build final session-aligned bars visible at cutoffs
+        Bars-->>MI: Final bars, revisions, observedThrough and readyAt
+        MI->>Features: Compute registered causal features
+        Features-->>MI: FeatureSnapshot with readiness and versions
+        MI->>Evidence: Produce typed dimension evidence and preserve contradiction
+        Evidence-->>MI: Assessments, unknowns, support, opposition and confidence caps
+        MI->>Context: Compose draft and semantic diff from prior version
+
+        alt No material change
+            Context-->>MI: NO_CHANGE
+            MI->>DB: Persist AnalysisRun and materiality decision
+            MI-->>Caller: Existing context reference plus evaluation trace
+        else Publish, degrade, revalidate or invalidate
+            Context-->>MI: Immutable MarketContext version and event fact
+            MI->>DB: Begin transaction
+            MI->>DB: Insert run, manifest, evidence, context and latest projection
+            MI->>Outbox: Insert event using same transaction
+            MI->>DB: Commit transaction
+            Outbox->>Bus: Publish at least once, partitioned by Context Key
+            Bus->>Consumers: MarketContext.Published / Degraded / Invalidated / Revalidated
+            Consumers-->>Bus: Idempotent acknowledgment and checkpoint
+            MI-->>Caller: Published context reference, decisionReadyAt and hashes
+        end
+    end
+
+    opt Replay parity verification
+        Caller->>MI: Re-evaluate same manifest, versions and virtual clock
+        MI-->>Caller: Identical structured output hash within registered tolerance
+    end

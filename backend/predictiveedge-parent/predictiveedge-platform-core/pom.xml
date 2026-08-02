@@ -22,6 +22,7 @@
     <module>../platform-eventing-contracts</module>
     <module>../platform-eventing-application</module>
     <module>../platform-eventing-infrastructure</module>
+    <module>../market-intelligence-domain</module>
     <module>../trade-guardian-domain</module>
     <module>../trade-guardian-application</module>
     <module>../trade-guardian-infrastructure</module>

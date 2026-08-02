@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1500" viewBox="0 0 1800 1500" role="img" aria-labelledby="title desc">
+  <title id="title">Market Intelligence point-in-time evaluation sequence</title>
+  <desc id="desc">A caller initiates a Market Intelligence evaluation. The engine resolves immutable intent and references, selects point-in-time observations, applies quality and finality, computes evidence, and either records abstention, records no material change, or atomically publishes a new Market Context.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="#475467"/></marker>
+    <style>
+      .title{font:700 30px 'Segoe UI',Arial,sans-serif;fill:#0B2545}.subtitle{font:400 16px 'Segoe UI',Arial,sans-serif;fill:#475467}
+      .lane{font:700 14px 'Segoe UI',Arial,sans-serif;fill:#101828}.step{font:600 14px 'Segoe UI',Arial,sans-serif;fill:#344054}.note{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475467}
+      .life{stroke:#98A2B3;stroke-width:2;stroke-dasharray:7 6}.msg{stroke:#475467;stroke-width:2;fill:none;marker-end:url(#arrow)}.return{stroke:#667085;stroke-width:1.8;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1800" height="1500" fill="#FFFFFF"/>
+  <text x="70" y="55" class="title">Market Intelligence - causal evaluation and publication sequence</text>
+  <text x="70" y="83" class="subtitle">Every branch persists an AnalysisRun; only material governed context changes enter the reliable event plane</text>
+
+  <g>
+    <rect x="45" y="115" width="175" height="66" rx="10" fill="#F7F8FA" stroke="#98A2B3"/><text x="132" y="143" text-anchor="middle" class="lane">CORE AI caller</text><text x="132" y="164" text-anchor="middle" class="note">intent / scheduler</text>
+    <rect x="260" y="115" width="175" height="66" rx="10" fill="#EAF2F8" stroke="#2E74B5"/><text x="347" y="153" text-anchor="middle" class="lane">MI application</text>
+    <rect x="475" y="115" width="175" height="66" rx="10" fill="#F7F8FA" stroke="#98A2B3"/><text x="562" y="143" text-anchor="middle" class="lane">Reference +</text><text x="562" y="164" text-anchor="middle" class="lane">observation ports</text>
+    <rect x="690" y="115" width="175" height="66" rx="10" fill="#DDF4FF" stroke="#0969DA" stroke-width="3"/><text x="777" y="143" text-anchor="middle" class="lane">Causal selector</text><text x="777" y="164" text-anchor="middle" class="lane">+ manifest</text>
+    <rect x="905" y="115" width="175" height="66" rx="10" fill="#E8F5EE" stroke="#238636"/><text x="992" y="143" text-anchor="middle" class="lane">Quality + bar</text><text x="992" y="164" text-anchor="middle" class="lane">finality</text>
+    <rect x="1120" y="115" width="175" height="66" rx="10" fill="#E8F5EE" stroke="#238636"/><text x="1207" y="143" text-anchor="middle" class="lane">Features +</text><text x="1207" y="164" text-anchor="middle" class="lane">evidence fusion</text>
+    <rect x="1335" y="115" width="175" height="66" rx="10" fill="#FFF6E5" stroke="#B7791F"/><text x="1422" y="143" text-anchor="middle" class="lane">Context +</text><text x="1422" y="164" text-anchor="middle" class="lane">repository</text>
+    <rect x="1550" y="115" width="205" height="66" rx="10" fill="#F3E8FF" stroke="#7E57C2"/><text x="1652" y="143" text-anchor="middle" class="lane">Outbox / Kafka /</text><text x="1652" y="164" text-anchor="middle" class="lane">CORE AI consumers</text>
+  </g>
+  <g>
+    <line x1="132" y1="181" x2="132" y2="1415" class="life"/><line x1="347" y1="181" x2="347" y2="1415" class="life"/><line x1="562" y1="181" x2="562" y2="1415" class="life"/><line x1="777" y1="181" x2="777" y2="1415" class="life"/><line x1="992" y1="181" x2="992" y2="1415" class="life"/><line x1="1207" y1="181" x2="1207" y2="1415" class="life"/><line x1="1422" y1="181" x2="1422" y2="1415" class="life"/><line x1="1652" y1="181" x2="1652" y2="1415" class="life"/>
+  </g>
+
+  <text x="145" y="225" class="step">1  evaluate(contextKey, intentRef, analysisCutoff, knowledgeCutoff)</text><path d="M132 240 H347" class="msg"/>
+  <text x="365" y="285" class="step">2  resolve clock, calendar, session, mappings, universe and active versions</text><path d="M347 300 H562" class="msg"/>
+  <text x="575" y="345" class="step">3  revisioned facts + effective/knowledge-dated references</text><path d="M562 360 H347" class="return"/>
+  <text x="365" y="405" class="step">4  select observations visible at both cutoffs</text><path d="M347 420 H777" class="msg"/>
+  <text x="790" y="465" class="step">5  ordered immutable Input Manifest + content hash</text><path d="M777 480 H347" class="return"/>
+  <text x="365" y="525" class="step">6  evaluate lineage, entitlement, freshness, gaps and coverage</text><path d="M347 540 H992" class="msg"/>
+
+  <rect x="250" y="575" width="1290" height="205" rx="12" fill="#FFF2F0" stroke="#D92D20" stroke-width="2"/>
+  <text x="275" y="607" class="lane">ALT - hard gate fails</text>
+  <text x="1010" y="647" class="step">BLOCKED / SUSPENDED + explicit issues</text><path d="M992 662 H347" class="return"/>
+  <text x="365" y="700" class="step">7a  persist abstained AnalysisRun and manifest lineage</text><path d="M347 715 H1422" class="msg"/>
+  <text x="145" y="753" class="step">NO_CONTEXT / INSUFFICIENT_EVIDENCE with reasons</text><path d="M347 768 H132" class="return"/>
+
+  <rect x="250" y="805" width="1290" height="430" rx="12" fill="#F1F8F4" stroke="#238636" stroke-width="2"/>
+  <text x="275" y="837" class="lane">ELSE - eligible or governed degraded mode</text>
+  <text x="1005" y="875" class="step">quality assessment + caps; build final session-aligned bars</text><path d="M992 890 H347" class="return"/>
+  <text x="365" y="930" class="step">7b  compute registered causal features</text><path d="M347 945 H1207" class="msg"/>
+  <text x="1220" y="985" class="step">8  typed evidence, contradiction, confidence and unknowns</text><path d="M1207 1000 H347" class="return"/>
+  <text x="365" y="1040" class="step">9  compose draft and semantic diff for the same ContextKey</text><path d="M347 1055 H1422" class="msg"/>
+  <rect x="275" y="1080" width="470" height="120" rx="10" fill="#FFFFFF" stroke="#98A2B3"/><text x="295" y="1110" class="lane">No material change</text><text x="295" y="1140" class="note">Persist AnalysisRun + materiality decision.</text><text x="295" y="1165" class="note">Return existing context reference; emit no false state-change event.</text>
+  <rect x="780" y="1080" width="730" height="120" rx="10" fill="#FFFFFF" stroke="#B7791F"/><text x="800" y="1110" class="lane">Publish / degrade / revalidate / invalidate</text><text x="800" y="1140" class="note">Atomically insert run, manifest, evidence and immutable context; replace latest projection;</text><text x="800" y="1165" class="note">insert outbox fact in the same database transaction.</text>
+
+  <text x="1435" y="1280" class="step">10  committed outbox fact</text><path d="M1422 1295 H1652" class="msg"/>
+  <text x="1450" y="1335" class="step">11  at-least-once ordered publication</text><path d="M1652 1350 H1422" class="return"/>
+  <text x="145" y="1390" class="step">12  context reference + decisionReadyAt + lineage hashes</text><path d="M1422 1405 H132" class="return"/>
+
+  <rect x="50" y="1440" width="1705" height="42" rx="9" fill="#F2F4F7" stroke="#98A2B3"/>
+  <text x="902" y="1467" text-anchor="middle" class="step">Replay proof: same manifest + versions + virtual clock = identical structured output hash within registered tolerance</text>
+</svg>
