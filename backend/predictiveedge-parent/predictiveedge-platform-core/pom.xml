@@ -24,6 +24,7 @@
     <module>../platform-eventing-infrastructure</module>
     <module>../trade-guardian-domain</module>
     <module>../trade-guardian-application</module>
+    <module>../trade-guardian-infrastructure</module>
     <module>../broker-domain</module>
     <module>../broker-spi</module>
     <module>../broker-paper-adapter</module>

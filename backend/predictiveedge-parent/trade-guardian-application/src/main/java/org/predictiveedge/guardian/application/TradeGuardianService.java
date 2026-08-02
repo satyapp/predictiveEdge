@@ -11,6 +11,8 @@ import org.predictiveedge.guardian.domain.InstrumentRef;
 import org.predictiveedge.guardian.domain.ManualFill;
 import org.predictiveedge.guardian.domain.TradeDirection;
 import org.predictiveedge.guardian.domain.TradeMonitoringCase;
+import org.predictiveedge.guardian.domain.TradeMonitoringEvent;
+import org.predictiveedge.guardian.domain.TradeMonitoringEvent.Type;
 
 /** Use cases for recording trader actions and controlling advisory monitoring only. */
 public final class TradeGuardianService {
@@ -33,7 +35,7 @@ public final class TradeGuardianService {
                 new ManualFill(command.quantity(), command.averageEntryPrice(), command.executedAt(),
                         command.externalExecutionRef()),
                 clock.instant());
-        if (!store.create(monitoringCase)) {
+        if (!store.create(monitoringCase, new TradeMonitoringEvent(Type.MANUAL_TRADE_REGISTERED, monitoringCase))) {
             throw new TradeGuardianFailure(TradeGuardianFailure.Code.RECOMMENDATION_ALREADY_MONITORED,
                     "The recommendation already has a registered trade");
         }
@@ -42,12 +44,12 @@ public final class TradeGuardianService {
 
     public TradeMonitoringCase suspendMonitoring(UUID traderId, UUID monitoringCaseId, String reason) {
         TradeMonitoringCase current = ownedCase(traderId, monitoringCaseId);
-        return replace(current, current.suspend(reason, clock.instant()));
+        return replace(current, current.suspend(reason, clock.instant()), Type.MONITORING_SUSPENDED);
     }
 
     public TradeMonitoringCase resumeMonitoring(UUID traderId, UUID monitoringCaseId) {
         TradeMonitoringCase current = ownedCase(traderId, monitoringCaseId);
-        return replace(current, current.resume(clock.instant()));
+        return replace(current, current.resume(clock.instant()), Type.MONITORING_RESUMED);
     }
 
     public TradeMonitoringCase completeManualTrade(CompleteManualTrade command) {
@@ -55,7 +57,7 @@ public final class TradeGuardianService {
         TradeMonitoringCase current = ownedCase(command.traderId(), command.monitoringCaseId());
         ManualFill exit = new ManualFill(command.quantity(), command.averageExitPrice(), command.executedAt(),
                 command.externalExecutionRef());
-        return replace(current, current.complete(exit, clock.instant()));
+        return replace(current, current.complete(exit, clock.instant()), Type.MONITORING_COMPLETED);
     }
 
     private TradeMonitoringCase ownedCase(UUID traderId, UUID monitoringCaseId) {
@@ -67,8 +69,9 @@ public final class TradeGuardianService {
                         "Trade monitoring case was not found"));
     }
 
-    private TradeMonitoringCase replace(TradeMonitoringCase current, TradeMonitoringCase changed) {
-        if (!store.replace(changed, current.version())) {
+    private TradeMonitoringCase replace(
+            TradeMonitoringCase current, TradeMonitoringCase changed, Type eventType) {
+        if (!store.replace(changed, current.version(), new TradeMonitoringEvent(eventType, changed))) {
             throw new TradeGuardianFailure(TradeGuardianFailure.Code.CONCURRENT_MODIFICATION,
                     "Trade monitoring case changed; reload it before retrying");
         }

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.predictiveedge.guardian.domain.MonitoringState;
 import org.predictiveedge.guardian.domain.TradeDirection;
 import org.predictiveedge.guardian.domain.TradeMonitoringCase;
+import org.predictiveedge.guardian.domain.TradeMonitoringEvent;
 
 class TradeGuardianServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-01T10:00:00Z");
@@ -103,7 +104,7 @@ class TradeGuardianServiceTest {
         private boolean rejectReplacements;
 
         @Override
-        public boolean create(TradeMonitoringCase monitoringCase) {
+        public boolean create(TradeMonitoringCase monitoringCase, TradeMonitoringEvent event) {
             boolean duplicate = cases.values().stream().anyMatch(existing ->
                     existing.recommendationId().equals(monitoringCase.recommendationId()));
             if (duplicate) {
@@ -119,7 +120,8 @@ class TradeGuardianServiceTest {
         }
 
         @Override
-        public boolean replace(TradeMonitoringCase monitoringCase, long expectedVersion) {
+        public boolean replace(
+                TradeMonitoringCase monitoringCase, long expectedVersion, TradeMonitoringEvent event) {
             TradeMonitoringCase current = cases.get(monitoringCase.monitoringCaseId());
             if (rejectReplacements || current == null || current.version() != expectedVersion) {
                 return false;
