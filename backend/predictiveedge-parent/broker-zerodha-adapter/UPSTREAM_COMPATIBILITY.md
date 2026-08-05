@@ -11,7 +11,7 @@ The HTTP documentation is authoritative for the wire protocol. The Java reposito
 
 ## Current Baseline
 
-- Audited: 2026-07-16
+- Audited: 2026-08-05
 - Official Java client: 4.0.0
 - Release date: 2026-03-30
 - HTTP header version: 3
@@ -25,6 +25,7 @@ The current adapter matches the upstream Java client for:
 - Historical instrument token and interval path
 - Historical `from`, `to`, `continuous`, and `oi` parameters
 - Candle fields: timestamp, OHLC, volume, and optional open interest
+- WebSocket packet framing, heartbeat, full equity packet, and full index packet layouts
 
 ## Operational Requirements From the HTTP API
 
@@ -36,10 +37,15 @@ The current adapter matches the upstream Java client for:
 
 Session expiry handling, encrypted token persistence, request throttling, retry policy, and historical-data caching must be implemented before the adapter is exposed through application APIs.
 
+Live-stream exposure additionally requires bounded reconnect/backoff, fragmented-frame handling, subscription replay,
+heartbeat/staleness monitoring, daily instrument-master refresh, and deterministic historical gap backfill.
+
 ## Intentional Differences
 
 - PredictiveEdge uses broker-neutral domain records rather than exposing Zerodha SDK models.
 - Historical query timestamps are explicitly formatted in `Asia/Kolkata`; the SDK uses the JVM default timezone.
+- Full-mode packets are decoded directly from the documented big-endian wire protocol and mapped back to stable instrument identities.
+- Heartbeats are ignored; malformed, truncated, and unsubscribed packets fail closed.
 - Credentials are supplied through a session provider so storage and encryption remain infrastructure concerns.
 - The Zerodha module has no live-order implementation.
 
