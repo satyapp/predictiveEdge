@@ -74,6 +74,14 @@ predictiveedge:
     zerodha:
       api-key: ${PE_ZERODHA_API_KEY:}
       api-secret: ${PE_ZERODHA_API_SECRET:}
+      stream:
+        scheduler-threads: ${PE_ZERODHA_STREAM_SCHEDULER_THREADS:2}
+        connect-timeout-seconds: ${PE_ZERODHA_STREAM_CONNECT_TIMEOUT_SECONDS:10}
+        initial-reconnect-milliseconds: ${PE_ZERODHA_STREAM_INITIAL_RECONNECT_MILLISECONDS:500}
+        maximum-reconnect-seconds: ${PE_ZERODHA_STREAM_MAXIMUM_RECONNECT_SECONDS:30}
+        maximum-reconnect-attempts: ${PE_ZERODHA_STREAM_MAXIMUM_RECONNECT_ATTEMPTS:8}
+        stale-after-seconds: ${PE_ZERODHA_STREAM_STALE_AFTER_SECONDS:15}
+        maximum-frame-bytes: ${PE_ZERODHA_STREAM_MAXIMUM_FRAME_BYTES:2097152}
 management:
   endpoint:
     health:
