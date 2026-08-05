@@ -18,6 +18,7 @@ public interface BrokerConnectionStore {
     void completeZerodhaRevocation(ClaimedBrokerConnection connection);
     void releaseZerodhaRevocation(ClaimedBrokerConnection connection, Instant now);
     void deleteZerodhaConnection(UUID userId);
+    boolean deleteZerodhaConnection(UUID userId, String encryptedAccessToken);
 
     record PendingConnection(UUID userId, String ownerSessionHash) {}
     record StoredBrokerConnection(String externalAccountId, String encryptedAccessToken, String ownerSessionHash,

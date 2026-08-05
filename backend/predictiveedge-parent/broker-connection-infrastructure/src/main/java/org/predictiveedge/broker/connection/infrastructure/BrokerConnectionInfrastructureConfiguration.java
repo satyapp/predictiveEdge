@@ -11,6 +11,7 @@ import org.predictiveedge.broker.connection.CredentialCipher;
 import org.predictiveedge.broker.zerodha.JdkZerodhaTransport;
 import org.predictiveedge.broker.zerodha.ZerodhaLoginClient;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionClient;
+import org.predictiveedge.broker.zerodha.ZerodhaSessionProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +30,15 @@ public class BrokerConnectionInfrastructureConfiguration {
     CredentialCipher brokerCredentialCipher(
             @Value("${predictiveedge.broker.credential-key}") String masterSecret) {
         return new AesGcmCredentialCipher(masterSecret, new SecureRandom());
+    }
+
+    @Bean
+    ZerodhaSessionProvider zerodhaSessionProvider(BrokerConnectionStore store, CredentialCipher cipher,
+            @Value("${predictiveedge.broker.zerodha.api-key:}") String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) return context -> {
+            throw new IllegalStateException("Zerodha API key is not configured");
+        };
+        return new StoredZerodhaSessionProvider(store, cipher, apiKey, Clock.systemUTC());
     }
 
     @Bean

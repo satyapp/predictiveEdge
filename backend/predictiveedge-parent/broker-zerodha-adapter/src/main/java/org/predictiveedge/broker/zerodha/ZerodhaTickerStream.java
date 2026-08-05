@@ -3,6 +3,7 @@ package org.predictiveedge.broker.zerodha;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.net.http.WebSocket;
+import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
@@ -77,15 +78,48 @@ final class ZerodhaTickerStream implements LiveMarketDataStream {
         if (closed.get() || attemptGeneration != generation.get()) return;
         try {
             var session = sessions.sessionFor(context);
-            connector.connect(ZerodhaLiveMarketDataProvider.endpoint(session), new SocketListener(attemptGeneration))
+            connector.connect(ZerodhaLiveMarketDataProvider.endpoint(session),
+                            new SocketListener(attemptGeneration, session))
                     .whenComplete((connected, failure) -> {
-                        if (failure != null) reconnect(attemptGeneration, failure);
+                        if (failure != null) connectionFailed(attemptGeneration, session, failure);
                         else if (closed.get() || attemptGeneration != generation.get())
                             connected.sendClose(WebSocket.NORMAL_CLOSURE, "stale connection");
                     });
         } catch (RuntimeException failure) {
             reconnect(attemptGeneration, failure);
         }
+    }
+
+    private void connectionFailed(long listenerGeneration, ZerodhaSession session, Throwable cause) {
+        if (isAuthenticationFailure(cause)) authenticationRejected(listenerGeneration, session, cause);
+        else reconnect(listenerGeneration, cause);
+    }
+
+    private void authenticationRejected(long listenerGeneration, ZerodhaSession session, Throwable cause) {
+        if (closed.get() || listenerGeneration != generation.get()) return;
+        generation.incrementAndGet(); reconnectScheduled.set(false);
+        var current = socket;
+        if (current != null) current.abort();
+        try { sessions.authenticationFailed(context, session); }
+        catch (RuntimeException evictionFailure) { cause.addSuppressed(evictionFailure); }
+        notifyState(MarketDataStreamState.FAILED);
+        notifyFailure(ZerodhaLiveMarketDataProvider.connectionFailure(
+                "Zerodha rejected the market-data session; reconnect the broker account", cause));
+    }
+
+    private static boolean isAuthenticationFailure(Throwable failure) {
+        for (Throwable current = failure; current != null; current = current.getCause()) {
+            if (current instanceof WebSocketHandshakeException handshake
+                    && (handshake.getResponse().statusCode() == 401 || handshake.getResponse().statusCode() == 403))
+                return true;
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(java.util.Locale.ROOT);
+                if (normalized.contains("tokenexception") || normalized.contains("invalid token")
+                        || normalized.contains("authentication failed")) return true;
+            }
+        }
+        return false;
     }
 
     private void connected(long listenerGeneration, WebSocket webSocket) {
@@ -144,10 +178,13 @@ final class ZerodhaTickerStream implements LiveMarketDataStream {
 
     private final class SocketListener implements WebSocket.Listener {
         private final long listenerGeneration;
+        private final ZerodhaSession session;
         private final ByteArrayOutputStream binary = new ByteArrayOutputStream();
         private final StringBuilder text = new StringBuilder();
 
-        private SocketListener(long listenerGeneration) { this.listenerGeneration = listenerGeneration; }
+        private SocketListener(long listenerGeneration, ZerodhaSession session) {
+            this.listenerGeneration = listenerGeneration; this.session = session;
+        }
 
         @Override public void onOpen(WebSocket webSocket) { connected(listenerGeneration, webSocket); }
 
@@ -186,8 +223,8 @@ final class ZerodhaTickerStream implements LiveMarketDataStream {
                 try {
                     var root = json.readTree(text.toString());
                     if ("error".equals(root.path("type").asText())) {
-                        webSocket.abort(); reconnect(listenerGeneration,
-                                new IllegalStateException(root.path("data").asText("Zerodha stream error")));
+                        var failure = new IllegalStateException(root.path("data").asText("Zerodha stream error"));
+                        webSocket.abort(); connectionFailed(listenerGeneration, session, failure);
                     }
                 } catch (Exception invalid) {
                     webSocket.abort(); reconnect(listenerGeneration, invalid);

@@ -141,4 +141,12 @@ public final class JdbcBrokerConnectionStore implements BrokerConnectionStore {
     public void deleteZerodhaConnection(UUID userId) {
         jdbc.update("delete from broker_connections where user_id=? and broker_id='zerodha'", userId);
     }
+
+    @Override
+    public boolean deleteZerodhaConnection(UUID userId, String encryptedAccessToken) {
+        return jdbc.update("""
+                delete from broker_connections where user_id=? and broker_id='zerodha'
+                  and encrypted_access_token=?
+                """, userId, encryptedAccessToken) == 1;
+    }
 }

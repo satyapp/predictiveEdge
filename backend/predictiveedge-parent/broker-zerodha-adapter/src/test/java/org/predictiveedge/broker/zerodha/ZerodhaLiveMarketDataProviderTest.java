@@ -84,11 +84,42 @@ class ZerodhaLiveMarketDataProviderTest {
         stream.close();
     }
 
+    @Test
+    void invalidatesRejectedSessionWithoutReconnectLoop() {
+        var connector = new FakeConnector(); var sink = new RecordingListener();
+        var sessions = new RecordingSessionProvider();
+        var stream = provider(connector, sessions).connect(
+                BrokerContext.withoutCredentials(UUID.randomUUID(), "ZD123"), subscription(), sink);
+
+        connector.listeners.getFirst().onText(connector.sockets.getFirst(),
+                "{\"type\":\"error\",\"data\":\"TokenException: invalid token\"}", true);
+
+        assertThat(sessions.rejected).isNotNull();
+        assertThat(stream.state()).isEqualTo(MarketDataStreamState.FAILED);
+        assertThat(connector.sockets).hasSize(1);
+        assertThat(sink.failures).hasSize(1);
+        stream.close();
+    }
+
     private ZerodhaLiveMarketDataProvider provider(FakeConnector connector) {
-        return new ZerodhaLiveMarketDataProvider(context -> new ZerodhaSession("api-key", "access-token"),
+        return provider(connector, context -> new ZerodhaSession("api-key", "access-token"));
+    }
+
+    private ZerodhaLiveMarketDataProvider provider(FakeConnector connector, ZerodhaSessionProvider sessions) {
+        return new ZerodhaLiveMarketDataProvider(sessions,
                 connector, scheduler, Clock.fixed(EXCHANGE_AT.plusMillis(250), ZoneOffset.UTC), new ObjectMapper(),
                 new ZerodhaReconnectPolicy(Duration.ofMillis(1), Duration.ofMillis(5), 3,
                         Duration.ofSeconds(30), 1_048_576));
+    }
+
+    private static final class RecordingSessionProvider implements ZerodhaSessionProvider {
+        private ZerodhaSession rejected;
+        @Override public ZerodhaSession sessionFor(BrokerContext context) {
+            return new ZerodhaSession("api-key", "access-token");
+        }
+        @Override public void authenticationFailed(BrokerContext context, ZerodhaSession rejectedSession) {
+            rejected = rejectedSession;
+        }
     }
 
     private static LiveMarketDataSubscription subscription() {

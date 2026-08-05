@@ -165,6 +165,13 @@ class BrokerConnectionServiceTest {
         }
         public void releaseZerodhaRevocation(ClaimedBrokerConnection claimed, Instant now) {}
         public void deleteZerodhaConnection(UUID userId) { deleted = true; connection = Optional.empty(); }
+        @Override
+        public boolean deleteZerodhaConnection(UUID userId, String encryptedAccessToken) {
+            if (connection.isPresent() && connection.get().encryptedAccessToken().equals(encryptedAccessToken)) {
+                deleteZerodhaConnection(userId); return true;
+            }
+            return false;
+        }
     }
 
     private static final class PassthroughCipher implements CredentialCipher {
