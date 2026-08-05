@@ -16,6 +16,7 @@ public record MarketEvidence(
         Instant detectedAt,
         Instant expiresAt,
         List<FeatureValue> sourceFeatures,
+        List<ContentHash> contextualInputHashes,
         String ruleVersion,
         ContentHash contentHash) {
 
@@ -37,18 +38,21 @@ public record MarketEvidence(
             throw new IllegalArgumentException("Evidence times are inconsistent");
         }
         sourceFeatures = List.copyOf(Objects.requireNonNull(sourceFeatures, "Source features are required")
-                .stream().sorted(Comparator.comparing(value -> value.definitionRef().featureId().value()))
+                .stream().sorted(Comparator.comparing((FeatureValue value) -> value.definitionRef().featureId().value())
+                        .thenComparing(value -> value.definitionRef().version()))
                 .toList());
-        if (sourceFeatures.isEmpty()) {
-            throw new IllegalArgumentException("Evidence requires at least one source feature");
-        }
+        contextualInputHashes = List.copyOf(Objects.requireNonNull(contextualInputHashes,
+                "Contextual input hashes are required").stream().distinct()
+                .sorted(Comparator.comparing(ContentHash::value)).toList());
+        if (sourceFeatures.isEmpty() && contextualInputHashes.isEmpty())
+            throw new IllegalArgumentException("Evidence requires a feature or contextual input");
         if (ruleVersion == null || ruleVersion.isBlank()) {
             throw new IllegalArgumentException("Evidence rule version is required");
         }
         ruleVersion = ruleVersion.trim();
         Objects.requireNonNull(contentHash, "Evidence content hash is required");
         if (!contentHash.equals(EvidenceHash.hash(dimension, state, strength, uncertainty, dependencyKey,
-                effectiveAt, detectedAt, expiresAt, sourceFeatures, ruleVersion))) {
+                effectiveAt, detectedAt, expiresAt, sourceFeatures, contextualInputHashes, ruleVersion))) {
             throw new IllegalArgumentException("Evidence hash does not match its contents");
         }
     }
@@ -57,8 +61,16 @@ public record MarketEvidence(
             int uncertainty, String dependencyKey, Instant effectiveAt, Instant detectedAt, Instant expiresAt,
             List<FeatureValue> sourceFeatures, String ruleVersion) {
         return new MarketEvidence(dimension, state, strength, uncertainty, dependencyKey, effectiveAt, detectedAt,
-                expiresAt, sourceFeatures, ruleVersion, EvidenceHash.hash(dimension, state, strength, uncertainty,
-                        dependencyKey, effectiveAt, detectedAt, expiresAt, sourceFeatures, ruleVersion));
+                expiresAt, sourceFeatures, List.of(), ruleVersion, EvidenceHash.hash(dimension, state, strength,
+                        uncertainty, dependencyKey, effectiveAt, detectedAt, expiresAt, sourceFeatures, List.of(), ruleVersion));
+    }
+
+    public static MarketEvidence createContextual(EvidenceDimension dimension, EvidenceState state, int strength,
+            int uncertainty, String dependencyKey, Instant effectiveAt, Instant detectedAt, Instant expiresAt,
+            List<ContentHash> inputHashes, String ruleVersion) {
+        return new MarketEvidence(dimension, state, strength, uncertainty, dependencyKey, effectiveAt, detectedAt,
+                expiresAt, List.of(), inputHashes, ruleVersion, EvidenceHash.hash(dimension, state, strength,
+                        uncertainty, dependencyKey, effectiveAt, detectedAt, expiresAt, List.of(), inputHashes, ruleVersion));
     }
 
     public int adjustedStrength() {
@@ -69,10 +81,23 @@ public record MarketEvidence(
         boolean valid = switch (dimension) {
             case DIRECTION -> state == EvidenceState.BULLISH || state == EvidenceState.BEARISH
                     || state == EvidenceState.NEUTRAL || state == EvidenceState.UNKNOWN;
+            case TREND_QUALITY -> state == EvidenceState.BULLISH || state == EvidenceState.BEARISH
+                    || state == EvidenceState.WEAK || state == EvidenceState.UNKNOWN;
             case VOLATILITY -> state == EvidenceState.EXPANDING || state == EvidenceState.CONTRACTING
                     || state == EvidenceState.NORMAL || state == EvidenceState.UNKNOWN;
+            case INTRADAY_LOCATION -> state == EvidenceState.ABOVE_VALUE || state == EvidenceState.BELOW_VALUE
+                    || state == EvidenceState.AT_VALUE || state == EvidenceState.UNKNOWN;
+            case TRIGGER -> state == EvidenceState.BREAKOUT || state == EvidenceState.BREAKDOWN
+                    || state == EvidenceState.INSIDE || state == EvidenceState.UNKNOWN;
+            case MOMENTUM, RELATIVE_LEADERSHIP, BREADTH -> state == EvidenceState.BULLISH
+                    || state == EvidenceState.BEARISH || state == EvidenceState.NEUTRAL || state == EvidenceState.UNKNOWN;
             case PARTICIPATION -> state == EvidenceState.STRONG || state == EvidenceState.WEAK
                     || state == EvidenceState.NORMAL || state == EvidenceState.UNKNOWN;
+            case RISK_DISTANCE -> state == EvidenceState.LOW || state == EvidenceState.NORMAL
+                    || state == EvidenceState.HIGH || state == EvidenceState.UNKNOWN;
+            case MARKET_STRESS -> state == EvidenceState.LOW || state == EvidenceState.NORMAL
+                    || state == EvidenceState.ELEVATED || state == EvidenceState.EXTREME
+                    || state == EvidenceState.UNKNOWN;
         };
         if (!valid) {
             throw new IllegalArgumentException("Evidence state is invalid for dimension " + dimension);

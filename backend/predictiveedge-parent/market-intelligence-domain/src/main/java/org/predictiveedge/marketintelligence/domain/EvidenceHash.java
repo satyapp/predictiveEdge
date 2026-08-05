@@ -15,18 +15,28 @@ final class EvidenceHash {
     static ContentHash hash(EvidenceDimension dimension, EvidenceState state, int strength, int uncertainty,
             String dependencyKey, Instant effectiveAt, Instant detectedAt, Instant expiresAt,
             List<FeatureValue> features, String ruleVersion) {
+        return hash(dimension, state, strength, uncertainty, dependencyKey, effectiveAt, detectedAt,
+                expiresAt, features, List.of(), ruleVersion);
+    }
+
+    static ContentHash hash(EvidenceDimension dimension, EvidenceState state, int strength, int uncertainty,
+            String dependencyKey, Instant effectiveAt, Instant detectedAt, Instant expiresAt,
+            List<FeatureValue> features, List<ContentHash> contextualHashes, String ruleVersion) {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
             add(digest, dimension.name()); add(digest, state.name()); add(digest, Integer.toString(strength));
             add(digest, Integer.toString(uncertainty)); add(digest, dependencyKey.trim());
             add(digest, effectiveAt.toString()); add(digest, detectedAt.toString()); add(digest, expiresAt.toString());
-            features.stream().sorted(Comparator.comparing(value -> value.definitionRef().featureId().value()))
+        features.stream().sorted(Comparator.comparing((FeatureValue value) -> value.definitionRef().featureId().value())
+                        .thenComparing(value -> value.definitionRef().version()))
                     .forEach(value -> {
                         add(digest, value.definitionRef().featureId().value());
                         add(digest, value.definitionRef().version());
                         add(digest, value.value().stripTrailingZeros().toPlainString());
                         add(digest, value.inputManifestHash().value());
                     });
+            contextualHashes.stream().sorted(Comparator.comparing(ContentHash::value))
+                    .forEach(value -> add(digest, value.value()));
             add(digest, ruleVersion.trim());
             return new ContentHash(HexFormat.of().formatHex(digest.digest()));
         } catch (NoSuchAlgorithmException exception) {

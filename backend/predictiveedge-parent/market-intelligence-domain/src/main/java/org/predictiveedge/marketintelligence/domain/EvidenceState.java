@@ -10,6 +10,16 @@ public enum EvidenceState {
     NORMAL,
     STRONG,
     WEAK,
+    ABOVE_VALUE,
+    BELOW_VALUE,
+    AT_VALUE,
+    BREAKOUT,
+    BREAKDOWN,
+    INSIDE,
+    LOW,
+    HIGH,
+    ELEVATED,
+    EXTREME,
     MIXED,
     UNKNOWN
 }

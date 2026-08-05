@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Objects;
 
 /** Point-in-time advance/decline result with its complete universe coverage denominator. */
-public record AdvanceDeclineSnapshot(String universeId, String universeVersion, int advances, int declines,
+public record AdvanceDeclineSnapshot(String universeId, String universeVersion, EvaluationCutoff cutoff,
+        int advances, int declines,
         int unchanged, CoverageMeasurement coverage, BigDecimal netBreadthPercent, ContentHash inputManifestHash) {
     public AdvanceDeclineSnapshot {
         if (universeId == null || universeId.isBlank() || universeVersion == null || universeVersion.isBlank())
             throw new IllegalArgumentException("Universe identity and version are required");
-        Objects.requireNonNull(coverage); Objects.requireNonNull(netBreadthPercent); Objects.requireNonNull(inputManifestHash);
+        Objects.requireNonNull(cutoff); Objects.requireNonNull(coverage); Objects.requireNonNull(netBreadthPercent);
+        Objects.requireNonNull(inputManifestHash);
         if (advances < 0 || declines < 0 || unchanged < 0 || advances + declines + unchanged != coverage.receivedCount())
             throw new IllegalArgumentException("Breadth counts do not match coverage");
     }
@@ -33,7 +35,7 @@ public record AdvanceDeclineSnapshot(String universeId, String universeVersion, 
         var coverage = new CoverageMeasurement(universeId, constituents.size(), expectedMembers, exclusions);
         BigDecimal net = BigDecimal.valueOf(advances - declines).multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(coverage.assessableCount()), MathContext.DECIMAL128);
-        return new AdvanceDeclineSnapshot(universeId.trim(), universeVersion.trim(), advances, declines, unchanged,
+        return new AdvanceDeclineSnapshot(universeId.trim(), universeVersion.trim(), cutoff, advances, declines, unchanged,
                 coverage, net, inputManifestHash);
     }
 }
