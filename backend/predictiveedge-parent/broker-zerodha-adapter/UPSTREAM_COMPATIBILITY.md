@@ -26,6 +26,7 @@ The current adapter matches the upstream Java client for:
 - Historical `from`, `to`, `continuous`, and `oi` parameters
 - Candle fields: timestamp, OHLC, volume, and optional open interest
 - WebSocket packet framing, heartbeat, full equity packet, and full index packet layouts
+- WebSocket authentication query, subscribe command, and full-mode command
 
 ## Operational Requirements From the HTTP API
 
@@ -37,8 +38,9 @@ The current adapter matches the upstream Java client for:
 
 Session expiry handling, encrypted token persistence, request throttling, retry policy, and historical-data caching must be implemented before the adapter is exposed through application APIs.
 
-Live-stream exposure additionally requires bounded reconnect/backoff, fragmented-frame handling, subscription replay,
-heartbeat/staleness monitoring, daily instrument-master refresh, and deterministic historical gap backfill.
+The adapter now provides bounded reconnect/backoff, fragmented-frame handling, subscription replay, connection-level
+heartbeat/staleness monitoring, and bounded frame memory. Application exposure still requires daily instrument-master
+refresh, per-instrument freshness monitoring, and deterministic historical gap backfill.
 
 ## Intentional Differences
 
