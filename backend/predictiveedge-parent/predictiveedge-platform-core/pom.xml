@@ -25,6 +25,7 @@
     <module>../market-intelligence-domain</module>
     <module>../market-intelligence-application</module>
     <module>../market-intelligence-infrastructure</module>
+    <module>../market-intelligence-api</module>
     <module>../trade-guardian-domain</module>
     <module>../trade-guardian-application</module>
     <module>../trade-guardian-infrastructure</module>

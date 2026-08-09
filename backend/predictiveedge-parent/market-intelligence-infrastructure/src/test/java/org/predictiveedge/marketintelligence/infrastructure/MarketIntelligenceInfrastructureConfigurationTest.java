@@ -2,9 +2,11 @@ package org.predictiveedge.marketintelligence.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
 import org.predictiveedge.marketintelligence.domain.BarTimeframe;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class MarketIntelligenceInfrastructureConfigurationTest {
     @Test
@@ -18,5 +20,21 @@ class MarketIntelligenceInfrastructureConfigurationTest {
     void requiresAtLeastOneTimeframe() {
         assertThatThrownBy(() -> MarketIntelligenceInfrastructureConfiguration.parseTimeframes(" , "))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void wiresTheGovernedCalendarPublicationUseCase() {
+        var configuration = new MarketIntelligenceInfrastructureConfiguration();
+        var port = configuration.marketSessionPublicationPort(mock(JdbcTemplate.class));
+
+        assertThat(configuration.marketSessionCalendarService(port)).isNotNull();
+    }
+
+    @Test
+    void wiresThePointInTimeMarketBarQueryUseCase() {
+        var configuration = new MarketIntelligenceInfrastructureConfiguration();
+        var port = configuration.marketBarQueryPort(mock(JdbcTemplate.class));
+
+        assertThat(configuration.marketBarQueryService(port)).isNotNull();
     }
 }

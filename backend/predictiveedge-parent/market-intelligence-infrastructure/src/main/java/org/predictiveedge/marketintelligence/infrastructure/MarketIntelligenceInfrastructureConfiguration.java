@@ -10,6 +10,10 @@ import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
 import org.predictiveedge.marketintelligence.application.MarketBarPublicationPort;
 import org.predictiveedge.marketintelligence.application.MarketIntelligenceTickConsumer;
 import org.predictiveedge.marketintelligence.application.MarketSessionPort;
+import org.predictiveedge.marketintelligence.application.MarketSessionCalendarService;
+import org.predictiveedge.marketintelligence.application.MarketSessionPublicationPort;
+import org.predictiveedge.marketintelligence.application.MarketBarQueryPort;
+import org.predictiveedge.marketintelligence.application.MarketBarQueryService;
 import org.predictiveedge.marketintelligence.application.MarketTickRejectionPort;
 import org.predictiveedge.marketintelligence.application.UserMarketIntelligenceSubscriptionService;
 import org.predictiveedge.marketintelligence.domain.BarFinalityPolicy;
@@ -29,6 +33,26 @@ public class MarketIntelligenceInfrastructureConfiguration {
     @Bean
     MarketSessionPort marketSessionPort(JdbcTemplate jdbc) {
         return new JdbcMarketSessionAdapter(jdbc);
+    }
+
+    @Bean
+    MarketSessionPublicationPort marketSessionPublicationPort(JdbcTemplate jdbc) {
+        return new JdbcMarketSessionPublicationAdapter(jdbc);
+    }
+
+    @Bean
+    MarketSessionCalendarService marketSessionCalendarService(MarketSessionPublicationPort publications) {
+        return new MarketSessionCalendarService(publications);
+    }
+
+    @Bean
+    MarketBarQueryPort marketBarQueryPort(JdbcTemplate jdbc) {
+        return new JdbcMarketBarQueryAdapter(jdbc);
+    }
+
+    @Bean
+    MarketBarQueryService marketBarQueryService(MarketBarQueryPort bars) {
+        return new MarketBarQueryService(bars);
     }
 
     @Bean

@@ -6,7 +6,7 @@ This reference describes the current responsibility of each market-intelligence 
 
 ```mermaid
 flowchart LR
-    U["Authenticated user"] --> API["Subscription API — next"]
+    U["Authenticated user"] --> API["market-intelligence-api"]
     API --> APP["market-intelligence-application"]
     APP --> BROKER["Broker connection application"]
     BROKER --> Z["Zerodha live stream"]
@@ -14,11 +14,9 @@ flowchart LR
     APP --> DOMAIN["market-intelligence-domain"]
     APP --> INFRA["market-intelligence-infrastructure"]
     INFRA --> DB[("PostgreSQL")]
-    INFRA --> CAL["Calendar loader — next"]
-    APP --> READ["Bar and intelligence query API — next"]
+    INFRA --> CAL["Governed calendar publication"]
+    API --> READ["Point-in-time bar reads and replay"]
 
-    classDef next stroke-dasharray: 5 5;
-    class API,CAL,READ next;
 ```
 
 ## 2. market-intelligence-domain
@@ -107,12 +105,13 @@ flowchart TD
     U --> X["Stop subscription"]
     X --> CL["Close only that user's stream"]
 
-    N1["Next: authenticated REST API"] -.-> S
     N2["Next: stream health and lag metrics"] -.-> M
     N3["Next: partitioned processing and recovery"] -.-> O
+    Q["Authenticated latest or replay request"] --> QC["Apply tenant, range, analysis, and knowledge cutoffs"]
+    QC --> QP["Return latest revision per eligible interval"]
 
     classDef next stroke-dasharray: 5 5;
-    class N1,N2,N3 next;
+    class N2,N3 next;
 ```
 
 ### Sequence
@@ -120,7 +119,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     actor User
-    participant API as Subscription API — next
+    participant API as Authenticated subscription API
     participant Facade as UserMarketIntelligenceSubscriptionService
     participant Resolver as Instrument resolver
     participant Manager as Per-user subscription manager
@@ -171,7 +170,7 @@ The infrastructure module supplies the effective calendar, durable append-only p
 
 ```mermaid
 flowchart TD
-    OP["Market operations user"] --> LOADER["Load or revise exchange calendar — next"]
+    OP["Market operations user"] --> LOADER["Publish validated exchange calendar"]
     LOADER --> SESSION[("market_session")]
     LOADER --> PHASE[("market_session_phase")]
 
@@ -191,12 +190,12 @@ flowchart TD
     TIMER["Retention scheduler"] --> EVICT["Evict session ledgers after correction window"]
     EVICT --> CONSUMER
 
-    BARS --> QUERY["Point-in-time read repository — next"]
+    BARS --> QUERY["Point-in-time causal query adapter"]
     BARS --> OUTBOX["Bar revision event outbox — next"]
     REJECT --> OBS["Quality and operations dashboard — next"]
 
     classDef next stroke-dasharray: 5 5;
-    class LOADER,QUERY,OUTBOX,OBS next;
+    class OUTBOX,OBS next;
 ```
 
 ### Sequence
@@ -204,7 +203,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     actor Operator as Market operations user
-    participant Loader as Calendar loader — next
+    participant Loader as Calendar publication service
     participant DB as PostgreSQL
     participant Spring as Spring configuration
     participant Consumer as Tick consumer
@@ -240,16 +239,93 @@ sequenceDiagram
     end
 ```
 
-## 5. Recommended enhancement order
+## 5. market-intelligence-api
+
+### User flow
+
+The API module exposes one subscription resource per authenticated user. User identity is always taken from the verified bearer token and is never accepted from request data.
+
+```mermaid
+flowchart TD
+    U["User sends bearer token"] --> AUTH{"Token valid?"}
+    AUTH -- "No" --> UNAUTH["401 Unauthorized"]
+    AUTH -- "Yes" --> CMD{"Requested operation"}
+    CMD -- "PUT" --> VALIDATE["Validate account and instrument list"]
+    VALIDATE --> OWN["Derive user ID from authenticated identity"]
+    OWN --> START["Create or replace only this user's stream"]
+    START --> SAFE["Return broker-neutral status without provider tokens"]
+    CMD -- "GET" --> STATUS{"Subscription exists?"}
+    STATUS -- "Yes" --> SAFE
+    STATUS -- "No" --> NOTFOUND["404 Not Found"]
+    CMD -- "DELETE" --> STOP["Idempotently stop only this user's stream"]
+    STOP --> NOCONTENT["204 No Content"]
+    CMD -- "GET latest bar" --> LATEST["Apply analysis and knowledge cutoffs"]
+    LATEST --> ONE{"Eligible revision exists?"}
+    ONE -- "Yes" --> BAR["Return latest causal revision"]
+    ONE -- "No" --> NOTFOUND
+    CMD -- "GET replay" --> RANGE["Validate bounded range and opaque cursor"]
+    RANGE --> PAGE["Return chronological causal page"]
+    PAGE --> MORE{"More intervals available?"}
+    MORE -- "Yes" --> CURSOR["Return next opaque cursor"]
+    MORE -- "No" --> DONE["Replay complete"]
+
+    N1["Next: rate limits and quotas"] -.-> VALIDATE
+    N2["Next: stream event notifications"] -.-> SAFE
+    classDef next stroke-dasharray: 5 5;
+    class N1,N2 next;
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Security as Bearer-token filter
+    participant API as Subscription controller
+    participant Facade as User intelligence subscription service
+    participant Query as Market bar query service
+    participant Manager as Per-user stream manager
+
+    User->>Security: PUT subscription with bearer token
+    Security->>Security: Authenticate token and establish identity
+    alt Invalid or missing token
+        Security-->>User: 401 Unauthorized
+    else Authenticated
+        Security->>API: Request plus authenticated principal
+        API->>API: Validate account and instruments
+        API->>Facade: subscribe(principal user, account, instruments)
+        Facade->>Manager: Create or replace user's singleton stream
+        Manager-->>Facade: Current stream status
+        Facade-->>API: Broker-neutral subscription status
+        API-->>User: 200 OK
+    end
+
+    User->>Security: GET subscription
+    Security->>API: Authenticated principal
+    API->>Facade: status(principal user)
+    Facade-->>API: Status or empty
+    API-->>User: 200 OK or 404 Not Found
+
+    User->>Security: DELETE subscription
+    Security->>API: Authenticated principal
+    API->>Facade: unsubscribe(principal user)
+    Facade->>Manager: Close only that user's stream
+    API-->>User: 204 No Content
+
+    User->>Security: GET latest bar or replay with two causal cutoffs
+    Security->>API: Authenticated principal
+    API->>Query: Query tenant bars by analysis and knowledge cutoff
+    Query-->>API: Latest revision or bounded chronological page
+    API-->>User: Causal bar response and optional continuation cursor
+```
+
+## 6. Recommended enhancement order
 
 ```mermaid
 flowchart LR
-    E1["1. Calendar loader and validation"] --> E2["2. Authenticated subscription API"]
-    E2 --> E3["3. Bar read and replay API"]
-    E3 --> E4["4. Transactional bar event outbox"]
-    E4 --> E5["5. Stream lag, rejection, and quality metrics"]
-    E5 --> E6["6. Distributed partitioning and crash recovery"]
-    E6 --> E7["7. Feature and market-context pipeline"]
+    E1["1. Transactional bar event outbox"] --> E2["2. Stream lag, rejection, and quality metrics"]
+    E2 --> E3["3. Distributed partitioning and crash recovery"]
+    E3 --> E4["4. Feature and market-context pipeline"]
 ```
 
-The first enhancement should be the calendar loader because the live consumer intentionally rejects every tick for which no effective session definition exists.
+The governed calendar publisher, authenticated subscription commands, and point-in-time bar reads/replay are now implemented. The next enhancement should stage every published bar revision through the transactional outbox for reliable downstream delivery.
