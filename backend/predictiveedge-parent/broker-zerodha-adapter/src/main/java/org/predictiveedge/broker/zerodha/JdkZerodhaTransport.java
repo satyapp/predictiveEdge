@@ -1,12 +1,15 @@
 package org.predictiveedge.broker.zerodha;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import org.predictiveedge.broker.domain.BrokerFailure;
 
@@ -20,15 +23,18 @@ public final class JdkZerodhaTransport implements ZerodhaTransport, ZerodhaToken
 
     @Override
     public String get(URI uri, Map<String, String> headers) {
-        var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(15)).GET();
+        var request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(15))
+                .header("Accept-Encoding", "gzip")
+                .GET();
         headers.forEach(request::header);
         try {
-            var response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            var response = client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
                         "Zerodha request failed with HTTP " + response.statusCode());
             }
-            return response.body();
+            return decode(response.body(), response.headers().firstValue("Content-Encoding").orElse(""));
         } catch (IOException failure) {
             throw new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
                     "Zerodha request could not be completed");
@@ -37,6 +43,15 @@ public final class JdkZerodhaTransport implements ZerodhaTransport, ZerodhaToken
             throw new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
                     "Zerodha request was interrupted");
         }
+    }
+
+    static String decode(byte[] body, String contentEncoding) throws IOException {
+        if ("gzip".equalsIgnoreCase(contentEncoding.trim())) {
+            try (var gzip = new GZIPInputStream(new ByteArrayInputStream(body))) {
+                return new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+        return new String(body, StandardCharsets.UTF_8);
     }
 
     @Override

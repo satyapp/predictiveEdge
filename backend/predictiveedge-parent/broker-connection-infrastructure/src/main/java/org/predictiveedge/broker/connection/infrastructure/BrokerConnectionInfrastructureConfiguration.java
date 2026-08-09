@@ -11,14 +11,17 @@ import org.predictiveedge.broker.connection.BrokerConnectionService;
 import org.predictiveedge.broker.connection.BrokerConnectionStore;
 import org.predictiveedge.broker.connection.CredentialCipher;
 import org.predictiveedge.broker.connection.UserMarketDataSubscriptionManager;
+import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
 import org.predictiveedge.broker.zerodha.JdkZerodhaTransport;
 import org.predictiveedge.broker.zerodha.JdkZerodhaWebSocketConnector;
+import org.predictiveedge.broker.zerodha.ZerodhaInstrumentResolver;
 import org.predictiveedge.broker.zerodha.ZerodhaLiveMarketDataProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaLoginClient;
 import org.predictiveedge.broker.zerodha.ZerodhaReconnectPolicy;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionClient;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataProvider;
+import org.predictiveedge.broker.spi.LiveMarketDataInstrumentResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,6 +49,17 @@ public class BrokerConnectionInfrastructureConfiguration {
             throw new IllegalStateException("Zerodha API key is not configured");
         };
         return new StoredZerodhaSessionProvider(store, cipher, apiKey, Clock.systemUTC());
+    }
+
+    @Bean
+    JdkZerodhaTransport zerodhaTransport() {
+        return new JdkZerodhaTransport(HttpClient.newBuilder().build());
+    }
+
+    @Bean
+    LiveMarketDataInstrumentResolver zerodhaInstrumentResolver(
+            ZerodhaSessionProvider sessions, JdkZerodhaTransport transport) {
+        return new ZerodhaInstrumentResolver(sessions, transport, Clock.systemUTC());
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -90,9 +104,17 @@ public class BrokerConnectionInfrastructureConfiguration {
     }
 
     @Bean
+    UserMarketDataSubscriptionService userMarketDataSubscriptionService(
+            LiveMarketDataInstrumentResolver instruments,
+            UserMarketDataSubscriptionManager subscriptions) {
+        return new UserMarketDataSubscriptionService(instruments, subscriptions);
+    }
+
+    @Bean
     BrokerConnectionService brokerConnectionService(
             BrokerConnectionStore store,
             CredentialCipher cipher,
+            JdkZerodhaTransport transport,
             ObjectMapper json,
             @Value("${predictiveedge.broker.zerodha.api-key:}") String apiKey,
             @Value("${predictiveedge.broker.zerodha.api-secret:}") String apiSecret,
@@ -100,7 +122,6 @@ public class BrokerConnectionInfrastructureConfiguration {
             @Value("${predictiveedge.broker.connection-state-minutes:10}") long stateMinutes,
             @Value("${predictiveedge.broker.browser-lease-seconds:120}") long leaseSeconds,
             @Value("${predictiveedge.broker.browser-close-grace-seconds:30}") long closeGraceSeconds) {
-        var transport = new JdkZerodhaTransport(HttpClient.newBuilder().build());
         var settings = new BrokerConnectionService.Settings(apiKey, apiSecret, webBaseUrl,
                 Duration.ofMinutes(stateMinutes), Duration.ofSeconds(leaseSeconds),
                 Duration.ofSeconds(closeGraceSeconds));

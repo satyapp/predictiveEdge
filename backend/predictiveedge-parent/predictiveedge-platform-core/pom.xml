@@ -23,6 +23,8 @@
     <module>../platform-eventing-application</module>
     <module>../platform-eventing-infrastructure</module>
     <module>../market-intelligence-domain</module>
+    <module>../market-intelligence-application</module>
+    <module>../market-intelligence-infrastructure</module>
     <module>../trade-guardian-domain</module>
     <module>../trade-guardian-application</module>
     <module>../trade-guardian-infrastructure</module>

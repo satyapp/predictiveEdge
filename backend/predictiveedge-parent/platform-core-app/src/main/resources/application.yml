@@ -82,6 +82,13 @@ predictiveedge:
         maximum-reconnect-attempts: ${PE_ZERODHA_STREAM_MAXIMUM_RECONNECT_ATTEMPTS:8}
         stale-after-seconds: ${PE_ZERODHA_STREAM_STALE_AFTER_SECONDS:15}
         maximum-frame-bytes: ${PE_ZERODHA_STREAM_MAXIMUM_FRAME_BYTES:2097152}
+  market-intelligence:
+    timeframes: ${PE_MARKET_INTELLIGENCE_TIMEFRAMES:ONE_MINUTE,FIVE_MINUTES}
+    allowed-lateness: ${PE_MARKET_INTELLIGENCE_ALLOWED_LATENESS:PT2S}
+    aggregation-policy-version: ${PE_MARKET_INTELLIGENCE_AGGREGATION_POLICY_VERSION:tick-ohlcv-v1}
+    finality-policy-version: ${PE_MARKET_INTELLIGENCE_FINALITY_POLICY_VERSION:finality-v1}
+    session-retention: ${PE_MARKET_INTELLIGENCE_SESSION_RETENTION:PT24H}
+    retention-sweep-milliseconds: ${PE_MARKET_INTELLIGENCE_RETENTION_SWEEP_MILLISECONDS:60000}
 management:
   endpoint:
     health:

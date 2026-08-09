@@ -1,0 +1,71 @@
+package org.predictiveedge.marketintelligence.infrastructure;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Locale;
+import java.util.Set;
+import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
+import org.predictiveedge.marketintelligence.application.MarketBarPublicationPort;
+import org.predictiveedge.marketintelligence.application.MarketIntelligenceTickConsumer;
+import org.predictiveedge.marketintelligence.application.MarketSessionPort;
+import org.predictiveedge.marketintelligence.application.MarketTickRejectionPort;
+import org.predictiveedge.marketintelligence.application.UserMarketIntelligenceSubscriptionService;
+import org.predictiveedge.marketintelligence.domain.BarFinalityPolicy;
+import org.predictiveedge.marketintelligence.domain.BarTimeframe;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+@Configuration
+public class MarketIntelligenceInfrastructureConfiguration {
+    @Bean
+    JdbcMarketIntelligenceStore marketIntelligenceStore(JdbcTemplate jdbc) {
+        return new JdbcMarketIntelligenceStore(jdbc);
+    }
+
+    @Bean
+    MarketSessionPort marketSessionPort(JdbcTemplate jdbc) {
+        return new JdbcMarketSessionAdapter(jdbc);
+    }
+
+    @Bean
+    MarketIntelligenceTickConsumer marketIntelligenceTickConsumer(
+            MarketSessionPort sessions,
+            MarketBarPublicationPort publications,
+            MarketTickRejectionPort rejections,
+            @Value("${predictiveedge.market-intelligence.timeframes:ONE_MINUTE,FIVE_MINUTES}") String timeframes,
+            @Value("${predictiveedge.market-intelligence.allowed-lateness:PT2S}") Duration allowedLateness,
+            @Value("${predictiveedge.market-intelligence.aggregation-policy-version:tick-ohlcv-v1}") String aggregationVersion,
+            @Value("${predictiveedge.market-intelligence.finality-policy-version:finality-v1}") String finalityVersion) {
+        return new MarketIntelligenceTickConsumer(sessions, publications, rejections, parseTimeframes(timeframes),
+                new BarFinalityPolicy(allowedLateness, finalityVersion), aggregationVersion);
+    }
+
+    @Bean
+    UserMarketIntelligenceSubscriptionService userMarketIntelligenceSubscriptionService(
+            UserMarketDataSubscriptionService subscriptions, MarketIntelligenceTickConsumer consumer) {
+        return new UserMarketIntelligenceSubscriptionService(subscriptions, consumer);
+    }
+
+    @Bean
+    MarketIntelligenceRetentionReaper marketIntelligenceRetentionReaper(
+            MarketIntelligenceTickConsumer consumer,
+            @Value("${predictiveedge.market-intelligence.session-retention:PT24H}") Duration retention) {
+        return new MarketIntelligenceRetentionReaper(consumer, Clock.systemUTC(), retention);
+    }
+
+    static Set<BarTimeframe> parseTimeframes(String configured) {
+        if (configured == null || configured.isBlank())
+            throw new IllegalArgumentException("At least one market-intelligence timeframe is required");
+        EnumSet<BarTimeframe> parsed = EnumSet.noneOf(BarTimeframe.class);
+        Arrays.stream(configured.split(","))
+                .map(String::trim).filter(value -> !value.isEmpty())
+                .map(value -> BarTimeframe.valueOf(value.toUpperCase(Locale.ROOT)))
+                .forEach(parsed::add);
+        if (parsed.isEmpty()) throw new IllegalArgumentException("At least one market-intelligence timeframe is required");
+        return parsed;
+    }
+}

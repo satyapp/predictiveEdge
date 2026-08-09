@@ -22,9 +22,14 @@ class BrokerConnectionInfrastructureConfigurationTest {
         try {
             LiveMarketDataProvider provider = configuration.zerodhaLiveMarketDataProvider(
                     sessions, scheduler, new ObjectMapper(), 10, 500, 30, 8, 15, 2_097_152);
+            var transport = configuration.zerodhaTransport();
+            var resolver = configuration.zerodhaInstrumentResolver(sessions, transport);
+            var manager = configuration.userMarketDataSubscriptionManager(provider);
 
             assertThat(provider).isNotNull();
-            assertThat(configuration.userMarketDataSubscriptionManager(provider)).isNotNull();
+            assertThat(resolver).isNotNull();
+            assertThat(manager).isNotNull();
+            assertThat(configuration.userMarketDataSubscriptionService(resolver, manager)).isNotNull();
             assertThat(scheduler.isShutdown()).isFalse();
         } finally {
             scheduler.shutdown();
