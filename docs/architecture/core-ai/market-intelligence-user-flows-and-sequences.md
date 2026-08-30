@@ -87,7 +87,8 @@ flowchart TD
     S --> R["Resolve symbols to provider instrument IDs"]
     R --> M["Create or replace the user's managed stream"]
     M --> T["Receive normalized live ticks"]
-    T --> C{"Effective market session found?"}
+    T --> TL["Record receipt count and transport lag"]
+    TL --> C{"Effective market session found?"}
     C -- "No" --> RJ["Record rejected tick"]
     C -- "Yes" --> P{"Continuous trading phase?"}
     P -- "No" --> W["Advance watermark"]
@@ -105,13 +106,19 @@ flowchart TD
     U --> X["Stop subscription"]
     X --> CL["Close only that user's stream"]
 
-    N2["Next: stream health and lag metrics"] -.-> M
+    M --> SH["Record stream state changes and failures"]
+    RJ --> OM["Low-cardinality operational metrics"]
+    PB --> OM
+    CR --> OM
+    TL --> OM
+    SH --> OM
+    OM --> PROM["Authenticated Prometheus endpoint"]
     N3["Next: partitioned processing and recovery"] -.-> O
     Q["Authenticated latest or replay request"] --> QC["Apply tenant, range, analysis, and knowledge cutoffs"]
     QC --> QP["Return latest revision per eligible interval"]
 
     classDef next stroke-dasharray: 5 5;
-    class N2,N3 next;
+    class N3 next;
 ```
 
 ### Sequence
@@ -177,6 +184,7 @@ flowchart TD
     START["Application starts"] --> CFG["Create configured runtime beans"]
     CFG --> CAL["JDBC session adapter"]
     CFG --> STORE["JDBC intelligence store"]
+    CFG --> METRICS["Micrometer metrics adapter"]
     CFG --> CONSUMER["Canonical tick consumer"]
     CFG --> FACADE["Per-user intelligence subscription facade"]
 
@@ -184,18 +192,18 @@ flowchart TD
     CAL --> SESSION
     CAL --> PHASE
     CONSUMER --> STORE
+    CONSUMER --> METRICS
+    METRICS --> PROM["/actuator/prometheus"]
     STORE --> BARS[("market_bar_revision")]
+    STORE --> OUTBOX[("event_outbox")]
+    OUTBOX --> KAFKA["pe.market-intelligence.v1"]
     STORE --> REJECT[("market_tick_rejection")]
 
     TIMER["Retention scheduler"] --> EVICT["Evict session ledgers after correction window"]
     EVICT --> CONSUMER
 
     BARS --> QUERY["Point-in-time causal query adapter"]
-    BARS --> OUTBOX["Bar revision event outbox — next"]
-    REJECT --> OBS["Quality and operations dashboard — next"]
-
-    classDef next stroke-dasharray: 5 5;
-    class OUTBOX,OBS next;
+    PROM --> OBS["Quality and operations dashboard"]
 ```
 
 ### Sequence
@@ -209,6 +217,8 @@ sequenceDiagram
     participant Consumer as Tick consumer
     participant Calendar as JDBC session adapter
     participant Store as JDBC intelligence store
+    participant Outbox as Transactional event outbox
+    participant Metrics as Micrometer metrics adapter
     participant Reaper as Retention scheduler
 
     Operator->>Loader: Publish venue session and phase version
@@ -224,13 +234,21 @@ sequenceDiagram
     Calendar->>DB: Query effective session and ordered phases
     DB-->>Calendar: Session definition
     Calendar-->>Consumer: Domain MarketSession
+    Consumer->>Metrics: Record tick count and transport lag
 
     alt Canonical bar revision
         Consumer->>Store: publish(user, account, revision)
-        Store->>DB: Append market_bar_revision
+        rect rgb(235, 245, 255)
+            Note over Store,Outbox: One database transaction
+            Store->>DB: Append market_bar_revision
+            Store->>Outbox: Stage MarketBarRevisionPublished v1.0
+            Outbox->>DB: Append event_outbox
+        end
+        Consumer->>Metrics: Count publication and record availability delay
     else Rejected tick
         Consumer->>Store: reject(rejection)
         Store->>DB: Append market_tick_rejection
+        Consumer->>Metrics: Count rejection by governed reason
     end
 
     loop Configured retention sweep
@@ -323,9 +341,14 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    E1["1. Transactional bar event outbox"] --> E2["2. Stream lag, rejection, and quality metrics"]
-    E2 --> E3["3. Distributed partitioning and crash recovery"]
-    E3 --> E4["4. Feature and market-context pipeline"]
+    E1["Implemented: transactional bar event outbox"] --> E2["Implemented: stream lag, rejection, and quality metrics"]
+    E2 --> E3["Next: distributed partitioning and crash recovery"]
+    E3 --> E4["Then: feature and market-context pipeline"]
+
+    classDef done fill:#dcfce7,stroke:#15803d;
+    classDef next stroke-dasharray: 5 5;
+    class E1,E2 done;
+    class E3,E4 next;
 ```
 
-The governed calendar publisher, authenticated subscription commands, and point-in-time bar reads/replay are now implemented. The next enhancement should stage every published bar revision through the transactional outbox for reliable downstream delivery.
+The governed calendar publisher, authenticated subscription commands, point-in-time bar reads/replay, transactional bar-revision outbox, and low-cardinality operational metrics are now implemented. Prometheus can observe tick transport lag, received and rejected counts, bar publication delay and finality, plus stream state changes and failures without tenant, account, symbol, or token labels. The next enhancement should introduce distributed partition ownership and crash recovery for horizontally scaled aggregation.

@@ -6,9 +6,11 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
 import org.predictiveedge.marketintelligence.application.MarketBarPublicationPort;
 import org.predictiveedge.marketintelligence.application.MarketIntelligenceTickConsumer;
+import org.predictiveedge.marketintelligence.application.MarketIntelligenceMetricsPort;
 import org.predictiveedge.marketintelligence.application.MarketSessionPort;
 import org.predictiveedge.marketintelligence.application.MarketSessionCalendarService;
 import org.predictiveedge.marketintelligence.application.MarketSessionPublicationPort;
@@ -18,16 +20,27 @@ import org.predictiveedge.marketintelligence.application.MarketTickRejectionPort
 import org.predictiveedge.marketintelligence.application.UserMarketIntelligenceSubscriptionService;
 import org.predictiveedge.marketintelligence.domain.BarFinalityPolicy;
 import org.predictiveedge.marketintelligence.domain.BarTimeframe;
+import org.predictiveedge.platform.eventing.application.DomainEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.micrometer.core.instrument.MeterRegistry;
+
 @Configuration
 public class MarketIntelligenceInfrastructureConfiguration {
     @Bean
-    JdbcMarketIntelligenceStore marketIntelligenceStore(JdbcTemplate jdbc) {
-        return new JdbcMarketIntelligenceStore(jdbc);
+    MarketIntelligenceMetricsPort marketIntelligenceMetrics(MeterRegistry registry) {
+        return new MicrometerMarketIntelligenceMetrics(registry);
+    }
+
+    @Bean
+    JdbcMarketIntelligenceStore marketIntelligenceStore(
+            JdbcTemplate jdbc, ObjectMapper json, DomainEventPublisher events) {
+        return new JdbcMarketIntelligenceStore(jdbc, json, events, UUID::randomUUID);
     }
 
     @Bean
@@ -60,12 +73,14 @@ public class MarketIntelligenceInfrastructureConfiguration {
             MarketSessionPort sessions,
             MarketBarPublicationPort publications,
             MarketTickRejectionPort rejections,
+            MarketIntelligenceMetricsPort metrics,
             @Value("${predictiveedge.market-intelligence.timeframes:ONE_MINUTE,FIVE_MINUTES}") String timeframes,
             @Value("${predictiveedge.market-intelligence.allowed-lateness:PT2S}") Duration allowedLateness,
             @Value("${predictiveedge.market-intelligence.aggregation-policy-version:tick-ohlcv-v1}") String aggregationVersion,
             @Value("${predictiveedge.market-intelligence.finality-policy-version:finality-v1}") String finalityVersion) {
-        return new MarketIntelligenceTickConsumer(sessions, publications, rejections, parseTimeframes(timeframes),
-                new BarFinalityPolicy(allowedLateness, finalityVersion), aggregationVersion);
+        return new MarketIntelligenceTickConsumer(sessions, publications, rejections, metrics,
+                parseTimeframes(timeframes), new BarFinalityPolicy(allowedLateness, finalityVersion),
+                aggregationVersion);
     }
 
     @Bean

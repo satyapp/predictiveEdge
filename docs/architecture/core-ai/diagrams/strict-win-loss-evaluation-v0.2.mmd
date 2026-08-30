@@ -1,0 +1,31 @@
+flowchart TB
+    REC["Actionable AI recommendation\nBUY or SELL"]
+    FREEZE["Freeze outcome contract\nentry window + horizon + stop + targets\ncost model + slippage + versioned rules"]
+    OBSERVE["Observe causal market path and executable prices\nwithout look-ahead"]
+    RESOLVED{"Evaluation horizon resolved?"}
+    TEMP["UNRESOLVED\ntemporary state only"]
+    RESULT{"Positive return after costs\nunder frozen rules?"}
+    WIN["WIN"]
+    LOSS["LOSS"]
+    REASON["Diagnostic failure reasons\nnever alter the LOSS score"]
+    STORE["Immutable Learning Intelligence outcome"]
+    METRICS["Update net expectancy + profit factor + drawdown\ncalibration + coverage + tail-loss metrics"]
+    DRIFT["Feed Validation and Drift monitoring"]
+
+    REC --> FREEZE
+    FREEZE --> OBSERVE
+    OBSERVE --> RESOLVED
+    RESOLVED -->|"No"| TEMP
+    TEMP --> OBSERVE
+    RESOLVED -->|"Yes"| RESULT
+    RESULT -->|"Yes"| WIN
+    RESULT -->|"No / zero / breakeven"| LOSS
+    WIN --> STORE
+    LOSS --> REASON
+    REASON --> STORE
+    STORE --> METRICS
+    METRICS --> DRIFT
+
+    ABSTAIN["WAIT | NO_TRADE | INSUFFICIENT_EVIDENCE"]
+    ABSTAIN --> ASCORE["Separate abstention score\nnever mixed into directional win rate"]
+    ASCORE --> STORE

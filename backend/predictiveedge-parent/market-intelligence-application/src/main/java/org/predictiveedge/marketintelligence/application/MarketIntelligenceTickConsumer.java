@@ -50,6 +50,7 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
     private final MarketSessionPort sessions;
     private final MarketBarPublicationPort publications;
     private final MarketTickRejectionPort rejections;
+    private final MarketIntelligenceMetricsPort metrics;
     private final List<BarTimeframe> timeframes;
     private final BarFinalityPolicy finalityPolicy;
     private final String aggregationPolicyVersion;
@@ -62,9 +63,22 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
             Set<BarTimeframe> timeframes,
             BarFinalityPolicy finalityPolicy,
             String aggregationPolicyVersion) {
+        this(sessions, publications, rejections, MarketIntelligenceMetricsPort.noop(), timeframes,
+                finalityPolicy, aggregationPolicyVersion);
+    }
+
+    public MarketIntelligenceTickConsumer(
+            MarketSessionPort sessions,
+            MarketBarPublicationPort publications,
+            MarketTickRejectionPort rejections,
+            MarketIntelligenceMetricsPort metrics,
+            Set<BarTimeframe> timeframes,
+            BarFinalityPolicy finalityPolicy,
+            String aggregationPolicyVersion) {
         this.sessions = Objects.requireNonNull(sessions, "Market session port is required");
         this.publications = Objects.requireNonNull(publications, "Market bar publication port is required");
         this.rejections = Objects.requireNonNull(rejections, "Tick rejection port is required");
+        this.metrics = Objects.requireNonNull(metrics, "Market-intelligence metrics port is required");
         Objects.requireNonNull(timeframes, "Bar timeframes are required");
         if (timeframes.isEmpty()) throw new IllegalArgumentException("At least one bar timeframe is required");
         this.timeframes = List.copyOf(EnumSet.copyOf(timeframes));
@@ -80,17 +94,22 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
         if (brokerAccountId == null || brokerAccountId.isBlank())
             throw new IllegalArgumentException("Broker account id is required");
         Objects.requireNonNull(ticks, "Market ticks are required");
-        ticks.forEach(tick -> accept(userId, brokerAccountId, Objects.requireNonNull(tick)));
+        ticks.forEach(tick -> {
+            MarketTick required = Objects.requireNonNull(tick);
+            metrics.tickReceived(required);
+            accept(userId, brokerAccountId, required);
+        });
     }
 
     @Override
     public void onStateChanged(UUID userId, String brokerAccountId, MarketDataStreamState state) {
-        // Stream lifecycle remains owned by UserMarketDataSubscriptionManager.
+        metrics.streamStateChanged(Objects.requireNonNull(state, "Market-data stream state is required"));
     }
 
     @Override
     public void onFailure(UUID userId, String brokerAccountId, RuntimeException failure) {
-        // Operational failures remain owned by the broker connection boundary.
+        Objects.requireNonNull(failure, "Market-data stream failure is required");
+        metrics.streamFailed();
     }
 
     /** Advances event time without fabricating a market tick, for example at a governed session boundary. */
@@ -173,6 +192,7 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
                             BarFinalityState.FINAL, availableAt, null, calculated.contentHash(),
                             aggregationPolicyVersion, finalityPolicy.version());
                     publications.publish(userId, accountId, revision);
+                    metrics.barPublished(revision);
                     state.revisions.put(key, revision);
                 });
             }
@@ -194,6 +214,7 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
                 var corrected = previous.correct(calculated.values(), calculated.observedThrough(), correctedAt,
                         "LATE_OR_OUT_OF_ORDER_TICK", calculated.contentHash());
                 publications.publish(userId, accountId, corrected);
+                metrics.barPublished(corrected);
                 state.revisions.put(entry.getKey(), corrected);
             });
         }
@@ -229,9 +250,9 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
         long volume = last.cumulativeVolume() - baseline;
         if (volume < 0) {
             var rejected = inBar.getLast();
-            rejections.reject(new MarketTickRejection(state.userId, state.accountId, rejected,
+            reject(state.userId, state.accountId, rejected,
                     MarketTickRejection.Reason.INVALID_CUMULATIVE_VOLUME,
-                    "Cumulative volume moved below the session baseline"));
+                    "Cumulative volume moved below the session baseline");
         }
         return volume;
     }
@@ -294,7 +315,9 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
 
     private void reject(UUID userId, String accountId, MarketTick tick,
             MarketTickRejection.Reason reason, String detail) {
-        rejections.reject(new MarketTickRejection(userId, accountId, tick, reason, detail));
+        var rejection = new MarketTickRejection(userId, accountId, tick, reason, detail);
+        rejections.reject(rejection);
+        metrics.tickRejected(rejection);
     }
 
     private record FeedKey(UUID userId, String accountId, Instrument instrument,

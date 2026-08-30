@@ -36,10 +36,12 @@ class MarketIntelligenceTickConsumerTest {
             List.of(new SessionPhaseWindow(MarketSessionPhase.CONTINUOUS, OPEN, CLOSE)), "nse-calendar-v1");
     private final List<MarketBarRevision> publications = new ArrayList<>();
     private final List<MarketTickRejection> rejections = new ArrayList<>();
+    private final RecordingMetrics metrics = new RecordingMetrics();
     private final MarketIntelligenceTickConsumer consumer = new MarketIntelligenceTickConsumer(
             (instrument, timestamp) -> Optional.of(session),
             (userId, accountId, revision) -> publications.add(revision),
             rejections::add,
+            metrics,
             EnumSet.of(BarTimeframe.ONE_MINUTE),
             new BarFinalityPolicy(Duration.ofSeconds(2), "finality-v1"),
             "tick-ohlcv-v1");
@@ -69,6 +71,9 @@ class MarketIntelligenceTickConsumerTest {
         assertThat(bar.values().close()).isEqualByComparingTo("110");
         assertThat(bar.values().volume()).isEqualTo(15);
         assertThat(rejections).isEmpty();
+        assertThat(metrics.receivedTicks).hasSize(4);
+        assertThat(metrics.publishedBars).extracting(MarketBarRevision::finalityState)
+                .containsExactly(BarFinalityState.FINAL);
     }
 
     @Test
@@ -93,6 +98,10 @@ class MarketIntelligenceTickConsumerTest {
         consumer.onTicks(USER_ID, ACCOUNT_ID, List.of(late));
         assertThat(publications).hasSize(2);
         assertThat(rejections).extracting(MarketTickRejection::reason)
+                .containsExactly(MarketTickRejection.Reason.DUPLICATE);
+        assertThat(metrics.publishedBars).extracting(MarketBarRevision::finalityState)
+                .containsExactly(BarFinalityState.FINAL, BarFinalityState.CORRECTED);
+        assertThat(metrics.rejectedTicks).extracting(MarketTickRejection::reason)
                 .containsExactly(MarketTickRejection.Reason.DUPLICATE);
     }
 
@@ -159,6 +168,16 @@ class MarketIntelligenceTickConsumerTest {
         assertThat(consumer.evictSessionsEndedBefore(CLOSE.plusNanos(1))).isEqualTo(1);
     }
 
+    @Test
+    void reportsStreamLifecycleAndFailureWithoutTenantLabels() {
+        consumer.onStateChanged(USER_ID, ACCOUNT_ID, org.predictiveedge.broker.domain.MarketDataStreamState.CONNECTED);
+        consumer.onFailure(USER_ID, ACCOUNT_ID, new IllegalStateException("socket closed"));
+
+        assertThat(metrics.streamStates)
+                .containsExactly(org.predictiveedge.broker.domain.MarketDataStreamState.CONNECTED);
+        assertThat(metrics.failures).isEqualTo(1);
+    }
+
     private static EquityMarketTick tick(String exchangeAt, String receivedAt, String price, long volume) {
         var last = new BigDecimal(price);
         var exchange = Instant.parse(exchangeAt);
@@ -173,5 +192,23 @@ class MarketIntelligenceTickConsumerTest {
         return new IndexMarketTick(instrument, "256265", last, new BigDecimal("24900"),
                 new BigDecimal("25100"), new BigDecimal("24800"), new BigDecimal("24950"),
                 new BigDecimal("0.20"), instant, instant.plusMillis(100));
+    }
+
+    private static final class RecordingMetrics implements MarketIntelligenceMetricsPort {
+        private final List<org.predictiveedge.broker.domain.MarketTick> receivedTicks = new ArrayList<>();
+        private final List<MarketTickRejection> rejectedTicks = new ArrayList<>();
+        private final List<MarketBarRevision> publishedBars = new ArrayList<>();
+        private final List<org.predictiveedge.broker.domain.MarketDataStreamState> streamStates = new ArrayList<>();
+        private int failures;
+
+        @Override public void tickReceived(org.predictiveedge.broker.domain.MarketTick tick) {
+            receivedTicks.add(tick);
+        }
+        @Override public void tickRejected(MarketTickRejection rejection) { rejectedTicks.add(rejection); }
+        @Override public void barPublished(MarketBarRevision revision) { publishedBars.add(revision); }
+        @Override public void streamStateChanged(org.predictiveedge.broker.domain.MarketDataStreamState state) {
+            streamStates.add(state);
+        }
+        @Override public void streamFailed() { failures++; }
     }
 }

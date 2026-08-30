@@ -1,0 +1,51 @@
+flowchart TB
+    R1["Original AI recommendation R1\nimmutable evidence + trade plan"]
+    REVIEW["Trader review"]
+    TRADE["Manually executed and registered trade"]
+    TG["One Trade Guardian monitoring case"]
+
+    R1 --> REVIEW
+    REVIEW -->|"Accept and execute manually"| TRADE
+    TRADE --> TG
+
+    subgraph CURRENT["Continuous current evidence"]
+        QUALITY["Point-in-time quality + freshness"]
+        MARKET["Market + chart + regime"]
+        EXECUTION["Execution feasibility + spread + depth + slippage"]
+        EVENTS["News + corporate + regulatory events"]
+        RISK["Current user Risk status"]
+        PORTFOLIO["Current user Portfolio status"]
+        STATE["Actual trade + P&L + excursion state"]
+    end
+
+    QUALITY --> TG
+    MARKET --> TG
+    EXECUTION --> TG
+    EVENTS --> TG
+    RISK --> TG
+    PORTFOLIO --> TG
+    STATE --> TG
+
+    TG --> STATUS["Current advisory trade status"]
+    STATUS --> REVIEW
+    TG -->|"Material condition changed"| REQUIRED["RecommendationReassessmentRequired"]
+
+    REQUIRED --> BUNDLE["Fresh point-in-time AI bundle\nnew cutoffs + original chain + current trade"]
+    QUALITY --> BUNDLE
+    MARKET --> BUNDLE
+    EXECUTION --> BUNDLE
+    EVENTS --> BUNDLE
+    RISK --> BUNDLE
+    PORTFOLIO --> BUNDLE
+    STATE --> BUNDLE
+    R1 --> BUNDLE
+
+    BUNDLE --> READY{"Data causal and fresh?\nExecution feasible?\nValidation and calibration current?"}
+    READY -->|"No"| ABSTAIN["INSUFFICIENT_EVIDENCE / EXIT review"]
+    READY -->|"Yes"| AI["AI Decision Intelligence"]
+    AI --> R2["New immutable management recommendation R2\nHOLD | REDUCE | EXIT | UPDATE_STOP | UPDATE_TARGET"]
+    R2 --> VALIDATE["Expected-value + execution + risk + portfolio validator"]
+    ABSTAIN --> VALIDATE
+    VALIDATE --> REVIEW
+    R2 --> LEARN["Learning Intelligence case"]
+    TG --> LEARN

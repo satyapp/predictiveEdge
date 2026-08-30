@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PredictiveEdge AI Decision Intelligence architecture with execution, point-in-time quality, regime drift, validation, calibration, Trade Guardian and strict outcome accountability.">
+  <title>PredictiveEdge AI Decision Intelligence Architecture v0.2</title>
+  <style>
+    :root{color-scheme:light dark;--canvas:light-dark(#f3f6fa,#0b1220);--paper:light-dark(#fff,#111c2e);--strong:light-dark(#f8fbff,#16243a);--ink:light-dark(#17243a,#e7eef8);--muted:light-dark(#5d6c80,#a9b8cc);--line:light-dark(#dbe3ed,#2b3c55);--navy:light-dark(#143d67,#9ac8f5);--blue:light-dark(#1769aa,#63b3ed);--cyan:light-dark(#087d8f,#67d4df);--green:light-dark(#237454,#71d7a7);--amber:light-dark(#9b5d0b,#f1bc69);--red:light-dark(#a03c45,#f28b93);--soft-blue:light-dark(#eaf3fb,#142d48);--soft-cyan:light-dark(#e7f7f8,#10313a);--soft-amber:light-dark(#fff4e3,#382814);--shadow:0 14px 38px light-dark(rgba(20,61,103,.10),rgba(0,0,0,.28))}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--canvas);font-family:Inter,"Segoe UI",Arial,sans-serif;line-height:1.58}a{color:var(--blue)}code,pre{font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace}.shell{width:min(1240px,calc(100% - 32px));margin:0 auto}
+    .hero{color:#fff;padding:60px 0 48px;background:radial-gradient(circle at 84% 18%,rgba(31,201,217,.22),transparent 28%),linear-gradient(135deg,#102f50 0%,#174f7e 62%,#0b7282 100%)}.eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:.76rem;opacity:.8;font-weight:700}h1{font-size:clamp(2.2rem,5vw,4.3rem);line-height:1.04;margin:12px 0 18px;max-width:990px}.hero p{max-width:950px;font-size:1.08rem;color:rgba(255,255,255,.88)}.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}.meta span{border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 10px;font-size:.8rem}
+    .toc{position:sticky;top:10px;z-index:10;margin-top:-20px;padding:12px;display:flex;flex-wrap:wrap;gap:5px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--paper) 94%,transparent);box-shadow:var(--shadow);backdrop-filter:blur(12px)}.toc a{color:var(--navy);text-decoration:none;font-size:.82rem;font-weight:650;padding:7px 9px;border-radius:8px}.toc a:hover{background:var(--soft-blue)}main{padding:48px 0 76px}section{margin-bottom:58px;scroll-margin-top:90px}h2{color:var(--navy);font-size:clamp(1.55rem,3vw,2rem);margin:0 0 8px}h3{color:var(--navy);font-size:1.13rem;margin:0 0 8px}p{margin:0 0 14px}.lead{color:var(--muted);max-width:960px}
+    .callout{border-left:5px solid var(--cyan);background:var(--soft-cyan);border-radius:0 12px 12px 0;padding:18px 20px;margin:22px 0}.callout strong{color:var(--cyan)}.warning{border-left-color:var(--amber);background:var(--soft-amber)}.warning strong{color:var(--amber)}.grid{display:grid;gap:16px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 6px 22px light-dark(rgba(20,61,103,.05),rgba(0,0,0,.16))}.card p,.card li{color:var(--muted)}.card ul{padding-left:19px;margin:10px 0 0}.number{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:8px;margin-bottom:12px;background:var(--soft-blue);color:var(--blue);font-weight:800}.mandatory{color:var(--red);font-weight:700}
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:13px}table{width:100%;border-collapse:collapse;background:var(--paper)}th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top}th{background:var(--soft-blue);color:var(--navy);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}td{font-size:.9rem}tbody tr:last-child td{border-bottom:0}
+    .diagram-card{margin:22px 0;background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}.diagram-head{padding:18px 20px 12px;border-bottom:1px solid var(--line)}.diagram-head p{color:var(--muted);margin:4px 0 0}.diagram-stage{padding:18px;overflow-x:auto;background:var(--strong)}.mermaid{min-width:720px;text-align:center}.source-panel{border-top:1px solid var(--line)}details summary{cursor:pointer;padding:13px 18px;color:var(--navy);font-weight:700;list-style-position:inside}details[open] summary{border-bottom:1px solid var(--line)}.code-wrap{position:relative;background:#080d17;color:#dce8f7}.source{margin:0;padding:18px;overflow:auto;font-size:.78rem;line-height:1.5;white-space:pre}.copy{position:absolute;right:12px;top:10px;border:1px solid rgba(255,255,255,.28);border-radius:8px;background:rgba(255,255,255,.08);color:#fff;padding:6px 9px;cursor:pointer}.contract{margin:18px 0;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080d17;color:#dce8f7;overflow-x:auto}.contract code{white-space:pre}.rule-list{display:grid;gap:12px;padding:0;list-style:none}.rule-list li{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.rule-list span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--navy);color:var(--canvas);font-weight:800}.source-index a{overflow-wrap:anywhere}footer{padding:28px 0;color:rgba(255,255,255,.78);background:#102f50;font-size:.88rem}
+    @media(max-width:860px){.grid-2,.grid-3{grid-template-columns:1fr}.toc{position:static}.hero{padding-top:44px}.mermaid{min-width:640px}}@media(max-width:520px){.shell{width:min(100% - 20px,1240px)}.hero{padding:38px 0}h1{font-size:2.05rem}.toc a{width:100%}.diagram-stage{padding:10px}.mermaid{min-width:600px}th,td{padding:10px}}@media print{.toc,.copy{display:none}.hero{background:#143d67;print-color-adjust:exact}.diagram-card,.card{break-inside:avoid;box-shadow:none}details{display:none}}
+  </style>
+</head>
+<body>
+  <header class="hero"><div class="shell">
+    <div class="eyebrow">PredictiveEdge · Founder-confirmed target architecture</div>
+    <h1>AI Decision Intelligence Architecture</h1>
+    <p>One AI recommendation authority, twelve mandatory intelligence resources, positive-edge readiness gates, continuous Trade Guardian reassessment and strict binary accountability.</p>
+    <div class="meta"><span>Version 0.2</span><span>10 August 2026</span><span>Personal-use phase</span><span>AI recommends · Trader decides</span></div>
+  </div></header>
+
+  <div class="shell"><nav class="toc" aria-label="Architecture sections">
+    <a href="#authority">Authority</a><a href="#intelligence">Intelligence</a><a href="#complete">Complete architecture</a><a href="#readiness">Readiness</a><a href="#guardian">Guardian</a><a href="#learning">Learning</a><a href="#outcomes">Win / loss</a><a href="#contracts">Contracts</a><a href="#sources">MMD sources</a>
+  </nav></div>
+
+  <main class="shell">
+    <section id="authority">
+      <h2>Authority boundary</h2>
+      <p class="lead">The application creates governed facts, deterministic features, probability evidence, feasibility estimates and immutable records. AI Decision Intelligence alone creates recommendations. Readiness and safety gates can reject or force abstention; they never invent or reverse a recommendation.</p>
+      <div class="callout"><strong>Non-negotiable:</strong> Risk, Portfolio, Learning, Point-in-Time Quality, Regime/Drift, Execution, Validation and Calibration are mandatory. Missing, stale, cross-user, unvalidated or negative-edge context cannot produce an actionable recommendation.</div>
+      <div class="grid grid-3">
+        <article class="card"><div class="number">1</div><h3>Application builds truth</h3><p>Causal facts, deterministic features, execution estimates, validation results, calibrated probabilities and evidence manifests.</p></article>
+        <article class="card"><div class="number">2</div><h3>AI owns recommendation</h3><p>AI Decision Intelligence is the sole origin of BUY, SELL, WAIT, NO_TRADE and linked management advice.</p></article>
+        <article class="card"><div class="number">3</div><h3>Trader remains in control</h3><p>The recommendation is advisory. The trader accepts, rejects, watches and executes manually.</p></article>
+      </div>
+    </section>
+
+    <section id="intelligence">
+      <h2>Authoritative intelligence list</h2>
+      <p class="lead">All twelve resources are included in the same immutable, point-in-time decision bundle.</p>
+      <div class="table-wrap"><table><thead><tr><th>Intelligence</th><th>Purpose</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td><strong>Market</strong></td><td>Market/microstructure, news/events, corporate/fundamental, sector, macro/regulatory, session and eligibility context.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Chart</strong></td><td>Deterministic features, structures, levels, patterns and contradictory evidence.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Scanner</strong></td><td>Candidate rank, liquidity, eligibility and discovery evidence.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Strategy</strong></td><td>Approved strategy compatibility, governed parameters and validation references.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Risk</strong></td><td>User limits, sizing ceilings, drawdown, restrictions and kill switches.</td><td class="mandatory">Mandatory hard context</td></tr>
+        <tr><td><strong>Portfolio</strong></td><td>Capital, positions, concentration, correlation and portfolio restrictions.</td><td class="mandatory">Mandatory hard context</td></tr>
+        <tr><td><strong>Learning</strong></td><td>Comparable cases, AI outcomes, actual trades, failures and trader feedback.</td><td class="mandatory">Mandatory source and sink</td></tr>
+        <tr><td><strong>Point-in-Time Data Quality</strong></td><td>Lineage, causal cutoffs, first-seen time, freshness, completeness, adjustments and leakage checks.</td><td class="mandatory">Mandatory foundation</td></tr>
+        <tr><td><strong>Regime and Drift</strong></td><td>Trend/range, volatility, liquidity, gap/event and ongoing feature/prediction/outcome drift.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Execution</strong></td><td>Spread, depth, fill, slippage, fees, impact, latency and entry/exit feasibility.</td><td class="mandatory">Mandatory for action</td></tr>
+        <tr><td><strong>Validation</strong></td><td>Walk-forward, untouched holdout, cost-aware tests, baselines, shadow results and approval status.</td><td class="mandatory">Mandatory</td></tr>
+        <tr><td><strong>Calibration</strong></td><td>Calibrated probability, uncertainty, confidence cohort and expected value after costs.</td><td class="mandatory">Mandatory</td></tr>
+      </tbody></table></div>
+      <div class="callout warning"><strong>Boundary:</strong> Trader Intent is mandatory context, not intelligence. Trade Guardian monitors and requests new AI evaluations. Community Intelligence remains outside the initial personal-use decision path.</div>
+    </section>
+
+    <section id="complete">
+      <h2>Complete AI decision architecture</h2>
+      <p class="lead">The full path connects causal data, all intelligence resources, AI synthesis, positive-edge and safety gates, trader action, Trade Guardian, strict outcomes and drift feedback.</p>
+      <article class="diagram-card"><div class="diagram-head"><h3>End-to-end intelligence and accountability</h3><p>Source: <code>ai-decision-intelligence-architecture-v0.2.mmd</code></p></div><div class="diagram-stage"><pre class="mermaid">
+flowchart TB
+    subgraph EXT["External and user facts"]
+        MD["Historical candles + live ticks + depth"]
+        NE["Timestamped news + corporate disclosures"]
+        GR["Government + regulatory sources"]
+        AC["Account + positions"]
+        TI["Trader Intent"]
+    end
+    DQ["Point-in-Time Data Quality Intelligence\ncutoffs + lineage + freshness + leakage controls"]
+    MD --> DQ
+    NE --> DQ
+    GR --> DQ
+    AC --> DQ
+    TI --> DQ
+    subgraph MI["Market Intelligence"]
+        MDC["Market data + microstructure"]
+        NEC["News + event"]
+        CAC["Corporate action + issuer + fundamental"]
+        SEC["Sector"]
+        MRC["Macro + government + regulatory"]
+        ELC["Session + calendar + eligibility"]
+        MC["Immutable point-in-time MarketContext"]
+        MDC --> MC
+        NEC --> MC
+        CAC --> MC
+        SEC --> MC
+        MRC --> MC
+        ELC --> MC
+    end
+    DQ --> MDC
+    DQ --> NEC
+    DQ --> CAC
+    DQ --> MRC
+    MC --> CI["Chart Intelligence"]
+    MC --> SI["Scanner Intelligence"]
+    MC --> STI["Strategy Intelligence"]
+    MC --> RDI["Regime + Drift Intelligence"]
+    MC --> EI["Execution Intelligence\nspread + depth + fill + slippage + latency"]
+    MC --> RI["Risk Intelligence - mandatory"]
+    MC --> PI["Portfolio Intelligence - mandatory"]
+    AC --> RI
+    AC --> PI
+    LI["Learning Intelligence - mandatory\ncomparable decisions + outcomes"]
+    VI["Validation Intelligence - mandatory\nwalk-forward + holdout + cost-aware evidence"]
+    CAL["Calibration Intelligence - mandatory\nprobability + uncertainty + expected value after costs"]
+    PHASE["Discovery orchestration\nPRE_MARKET | LIVE_MARKET | POST_MARKET"]
+    LI --> VI
+    RDI --> VI
+    STI --> VI
+    VI --> CAL
+    EI --> CAL
+    subgraph BUNDLE["Point-in-time AITradingDecisionInputBundle"]
+        B["Market + Chart + Scanner + Strategy + Regime\nExecution + Validation + Calibration\nRisk + Portfolio + Learning + Trader Intent\ncausal evidence manifest"]
+    end
+    DQ --> B
+    MC --> B
+    CI --> B
+    SI --> B
+    STI --> B
+    RDI --> B
+    EI --> B
+    RI --> B
+    PI --> B
+    LI --> B
+    VI --> B
+    CAL --> B
+    TI --> B
+    PHASE --> B
+    B --> READY{"All mandatory resources current,\ncausal, validated and same user?"}
+    READY -->|"No"| IE["INSUFFICIENT_EVIDENCE / DATA_STALE"]
+    READY -->|"Yes"| AI["AI Decision Intelligence\nsole recommendation authority"]
+    AI --> REC["Structured AI recommendation\nentry window + horizon + stop + targets\nprobability + uncertainty + failure clarification"]
+    REC --> EV{"Positive expected value after costs\nand confidence above policy threshold?"}
+    CAL --> EV
+    EI --> EV
+    EV -->|"No"| ABSTAIN["NO_TRADE / WAIT"]
+    EV -->|"Yes"| VAL["Deterministic policy validator\nchecks; never invents a recommendation"]
+    RI --> VAL
+    PI --> VAL
+    EI --> VAL
+    VI --> VAL
+    TI --> VAL
+    VAL -->|"Valid"| REVIEW["Trader review"]
+    VAL -->|"Violation"| REJECT["AI recommendation rejected"]
+    REVIEW -->|"Accept"| BROKER["Manual execution at broker"]
+    REVIEW -->|"Reject / watch"| CASE["Immutable learning case"]
+    BROKER --> TRADE["Actual fills + costs + registered trade state"]
+    TRADE --> TG["Trade Guardian\ncontinuous advisory evaluation"]
+    MC --> TG
+    RDI --> TG
+    EI --> TG
+    RI --> TG
+    PI --> TG
+    TG --> REASSESS["Fresh reassessment bundle\ncurrent trade + original chain + new cutoffs"]
+    REASSESS --> AI
+    TG --> REVIEW
+    TG --> CASE
+    REC --> CASE
+    REJECT --> CASE
+    ABSTAIN --> CASE
+    CASE --> LI
+    TRADE --> SCORE["Strict model outcome\nevery BUY/SELL => WIN or LOSS after costs"]
+    SCORE --> CASE
+    SCORE --> DRIFT["Live performance + calibration drift monitor"]
+    DRIFT --> RDI
+    DRIFT --> VI
+      </pre></div><div class="source-panel"><details><summary>View exact Mermaid source</summary><div class="code-wrap"><button class="copy">Copy</button><pre class="source"><code data-from-rendered></code></pre></div></details></div></article>
+    </section>
+
+    <section id="readiness">
+      <h2>Decision-readiness and validation loop</h2>
+      <p class="lead">An AI response reaches the trader only when its edge remains positive after realistic costs and every mandatory policy is satisfied. The gate can abstain or reject; it cannot create a recommendation.</p>
+      <article class="diagram-card"><div class="diagram-head"><h3>Evidence-to-edge lifecycle</h3><p>Source: <code>decision-readiness-validation-loop-v0.2.mmd</code></p></div><div class="diagram-stage"><pre class="mermaid">
+flowchart TB
+    DATA["Point-in-time data quality\ncausal cutoff + lineage + freshness"]
+    REGIME["Regime + Drift Intelligence"]
+    SIGNALS["Market + Chart + Scanner + Strategy"]
+    EXEC["Execution Intelligence\nfill + spread + slippage + latency"]
+    VALID["Validation Intelligence\nwalk-forward + holdout + costs"]
+    CAL["Calibration Intelligence\nprobability + uncertainty + net expectancy"]
+    AI["AI Decision Intelligence"]
+    GATE{"Positive edge after costs\nand policy confidence met?"}
+    ABSTAIN["NO_TRADE | WAIT | INSUFFICIENT_EVIDENCE"]
+    POLICY["Risk + Portfolio + eligibility validator"]
+    TRADER["Trader review and manual execution"]
+    OUTCOME["Strict WIN / LOSS + actual P&amp;L"]
+    LEARN["Learning Intelligence"]
+    MONITOR["Performance + calibration drift"]
+    DATA --> REGIME
+    DATA --> SIGNALS
+    DATA --> EXEC
+    REGIME --> SIGNALS
+    SIGNALS --> VALID
+    REGIME --> VALID
+    VALID --> CAL
+    EXEC --> CAL
+    SIGNALS --> AI
+    REGIME --> AI
+    EXEC --> AI
+    VALID --> AI
+    CAL --> AI
+    AI --> GATE
+    CAL --> GATE
+    GATE -->|"No"| ABSTAIN
+    GATE -->|"Yes"| POLICY
+    POLICY --> TRADER
+    TRADER --> OUTCOME
+    ABSTAIN --> LEARN
+    OUTCOME --> LEARN
+    LEARN --> VALID
+    OUTCOME --> MONITOR
+    MONITOR --> REGIME
+    MONITOR --> CAL
+      </pre></div><div class="source-panel"><details><summary>View exact Mermaid source</summary><div class="code-wrap"><button class="copy">Copy</button><pre class="source"><code>flowchart TB
+    DATA["Point-in-time data quality\ncausal cutoff + lineage + freshness"]
+    REGIME["Regime + Drift Intelligence"]
+    SIGNALS["Market + Chart + Scanner + Strategy"]
+    EXEC["Execution Intelligence\nfill + spread + slippage + latency"]
+    VALID["Validation Intelligence\nwalk-forward + holdout + costs"]
+    CAL["Calibration Intelligence\nprobability + uncertainty + net expectancy"]
+    AI["AI Decision Intelligence"]
+    GATE{"Positive edge after costs\nand policy confidence met?"}
+    ABSTAIN["NO_TRADE | WAIT | INSUFFICIENT_EVIDENCE"]
+    POLICY["Risk + Portfolio + eligibility validator"]
+    TRADER["Trader review and manual execution"]
+    OUTCOME["Strict WIN / LOSS + actual P&amp;L"]
+    LEARN["Learning Intelligence"]
+    MONITOR["Performance + calibration drift"]
+    DATA --> REGIME
+    DATA --> SIGNALS
+    DATA --> EXEC
+    REGIME --> SIGNALS
+    SIGNALS --> VALID
+    REGIME --> VALID
+    VALID --> CAL
+    EXEC --> CAL
+    SIGNALS --> AI
+    REGIME --> AI
+    EXEC --> AI
+    VALID --> AI
+    CAL --> AI
+    AI --> GATE
+    CAL --> GATE
+    GATE -->|"No"| ABSTAIN
+    GATE -->|"Yes"| POLICY
+    POLICY --> TRADER
+    TRADER --> OUTCOME
+    ABSTAIN --> LEARN
+    OUTCOME --> LEARN
+    LEARN --> VALID
+    OUTCOME --> MONITOR
+    MONITOR --> REGIME
+    MONITOR --> CAL</code></pre></div></details></div></article>
+      <div class="grid grid-2">
+        <article class="card"><h3>Promotion evidence</h3><ul><li>Chronological walk-forward and untouched holdout</li><li>Costs, spread, slippage, latency and impact</li><li>Baseline and regime comparison</li><li>Shadow/paper observation</li><li>Approval, expiry and rollback policy</li></ul></article>
+        <article class="card"><h3>Success metrics</h3><ul><li>Strict directional WIN/LOSS</li><li>Net expectancy and profit factor</li><li>Maximum drawdown and tail losses</li><li>Probability calibration and coverage</li><li>Regime and confidence-bucket stability</li></ul></article>
+      </div>
+    </section>
+
+    <section id="guardian">
+      <h2>Trade Guardian reassessment</h2><p class="lead">The Guardian now monitors point-in-time freshness, regime and execution feasibility as well as market, risk, portfolio and actual trade state.</p>
+      <article class="diagram-card"><div class="diagram-head"><h3>Closed advisory reassessment loop</h3><p>Source: <code>trade-guardian-reassessment-lifecycle-v0.2.mmd</code></p></div><div class="diagram-stage"><pre class="mermaid">
+flowchart TB
+    R1["Original AI recommendation R1\nimmutable evidence + trade plan"]
+    REVIEW["Trader review"]
+    TRADE["Manually executed and registered trade"]
+    TG["One Trade Guardian monitoring case"]
+    R1 --> REVIEW
+    REVIEW -->|"Accept and execute manually"| TRADE
+    TRADE --> TG
+    subgraph CURRENT["Continuous current evidence"]
+        QUALITY["Point-in-time quality + freshness"]
+        MARKET["Market + chart + regime"]
+        EXECUTION["Execution feasibility + spread + depth + slippage"]
+        EVENTS["News + corporate + regulatory events"]
+        RISK["Current user Risk status"]
+        PORTFOLIO["Current user Portfolio status"]
+        STATE["Actual trade + P&amp;L + excursion state"]
+    end
+    QUALITY --> TG
+    MARKET --> TG
+    EXECUTION --> TG
+    EVENTS --> TG
+    RISK --> TG
+    PORTFOLIO --> TG
+    STATE --> TG
+    TG --> STATUS["Current advisory trade status"]
+    STATUS --> REVIEW
+    TG -->|"Material condition changed"| REQUIRED["RecommendationReassessmentRequired"]
+    REQUIRED --> BUNDLE["Fresh point-in-time AI bundle\nnew cutoffs + original chain + current trade"]
+    QUALITY --> BUNDLE
+    MARKET --> BUNDLE
+    EXECUTION --> BUNDLE
+    EVENTS --> BUNDLE
+    RISK --> BUNDLE
+    PORTFOLIO --> BUNDLE
+    STATE --> BUNDLE
+    R1 --> BUNDLE
+    BUNDLE --> READY{"Data causal and fresh?\nExecution feasible?\nValidation and calibration current?"}
+    READY -->|"No"| ABSTAIN["INSUFFICIENT_EVIDENCE / EXIT review"]
+    READY -->|"Yes"| AI["AI Decision Intelligence"]
+    AI --> R2["New immutable management recommendation R2\nHOLD | REDUCE | EXIT | UPDATE_STOP | UPDATE_TARGET"]
+    R2 --> VALIDATE["Expected-value + execution + risk + portfolio validator"]
+    ABSTAIN --> VALIDATE
+    VALIDATE --> REVIEW
+    R2 --> LEARN["Learning Intelligence case"]
+    TG --> LEARN
+      </pre></div></article>
+    </section>
+
+    <section id="learning">
+      <h2>Learning, validation and drift</h2><p class="lead">Comparable history informs every evaluation, while objective outcomes continuously update validation and drift status. Trader opinion remains separate from model correctness.</p>
+      <article class="diagram-card"><div class="diagram-head"><h3>Accountability feedback cycle</h3><p>Source: <code>learning-intelligence-accountability-v0.2.mmd</code></p></div><div class="diagram-stage"><pre class="mermaid">
+flowchart TB
+    REPO["Mandatory Decision / Outcome Repository"]
+    QUERY["Point-in-time comparable-case query"]
+    HISTORY["RecommendationHistoryContext\nWIN/LOSS + executed P&amp;L + net expectancy\nregime + confidence-bucket performance"]
+    CURRENT["Current Market + Chart + Scanner + Strategy\nRegime + Execution + Validation + Calibration\nRisk + Portfolio + Trader Intent"]
+    AI["AI Decision Intelligence"]
+    DISCLOSE["Required historical disclosure\nsample size + success ratio + failure clarification"]
+    VALIDATE["Validator checks history references and disclosure"]
+    TRADER["Trader: ACCEPT | REJECT | WATCH"]
+    FEEDBACK["Trader feedback + reason"]
+    OUTCOME["Resolved AI outcome\nWIN or LOSS"]
+    DRIFT["Performance + execution + calibration drift"]
+    REVALIDATE["Validation status\nAPPROVED | RESTRICTED | SHADOW_ONLY | BLOCKED"]
+    REPO --> QUERY
+    QUERY --> HISTORY
+    HISTORY --> AI
+    CURRENT --> AI
+    AI --> DISCLOSE
+    DISCLOSE --> VALIDATE
+    HISTORY --> VALIDATE
+    VALIDATE --> TRADER
+    TRADER --> FEEDBACK
+    DISCLOSE --> OUTCOME
+    FEEDBACK --> REPO
+    OUTCOME --> REPO
+    OUTCOME --> DRIFT
+    DRIFT --> REVALIDATE
+    REVALIDATE --> CURRENT
+    LOW["Example: 10 resolved recommendations\n2 wins / 8 losses = 20% success"]
+    LOW --> HISTORY
+    HISTORY --> CLARIFY["AI must explain evidence-backed failures\nand current similarities / differences"]
+    CLARIFY --> DISCLOSE
+      </pre></div></article>
+    </section>
+
+    <section id="outcomes">
+      <h2>Strict outcome accountability</h2><p class="lead">Every BUY/SELL remains a binary model outcome, but promotion decisions also measure whether the strategy produces positive expectancy without unacceptable drawdown.</p>
+      <article class="diagram-card"><div class="diagram-head"><h3>Frozen contract and evaluation</h3><p>Source: <code>strict-win-loss-evaluation-v0.2.mmd</code></p></div><div class="diagram-stage"><pre class="mermaid">
+flowchart TB
+    REC["Actionable AI recommendation\nBUY or SELL"]
+    FREEZE["Freeze outcome contract\nentry window + horizon + stop + targets\ncost model + slippage + versioned rules"]
+    OBSERVE["Observe causal market path and executable prices\nwithout look-ahead"]
+    RESOLVED{"Evaluation horizon resolved?"}
+    TEMP["UNRESOLVED\ntemporary state only"]
+    RESULT{"Positive return after costs\nunder frozen rules?"}
+    WIN["WIN"]
+    LOSS["LOSS"]
+    REASON["Diagnostic failure reasons\nnever alter the LOSS score"]
+    STORE["Immutable Learning Intelligence outcome"]
+    METRICS["Update net expectancy + profit factor + drawdown\ncalibration + coverage + tail-loss metrics"]
+    DRIFT["Feed Validation and Drift monitoring"]
+    REC --> FREEZE
+    FREEZE --> OBSERVE
+    OBSERVE --> RESOLVED
+    RESOLVED -->|"No"| TEMP
+    TEMP --> OBSERVE
+    RESOLVED -->|"Yes"| RESULT
+    RESULT -->|"Yes"| WIN
+    RESULT -->|"No / zero / breakeven"| LOSS
+    WIN --> STORE
+    LOSS --> REASON
+    REASON --> STORE
+    STORE --> METRICS
+    METRICS --> DRIFT
+    ABSTAIN["WAIT | NO_TRADE | INSUFFICIENT_EVIDENCE"]
+    ABSTAIN --> ASCORE["Separate abstention score\nnever mixed into directional win rate"]
+    ASCORE --> STORE
+      </pre></div></article>
+      <ul class="rule-list"><li><span>1</span><div><strong>WIN/LOSS stays strict.</strong> Reasons never excuse a loss.</div></li><li><span>2</span><div><strong>Net expectancy matters.</strong> Win rate alone cannot approve or promote a model.</div></li><li><span>3</span><div><strong>Abstentions are separate.</strong> Measure missed opportunity and coverage without corrupting directional win rate.</div></li></ul>
+    </section>
+
+    <section id="contracts">
+      <h2>Core immutable contracts</h2><div class="grid grid-2">
+        <article class="card"><h3>Decision bundle additions</h3><div class="contract"><code>AITradingDecisionInputBundle {
+  pointInTimeEvidenceManifest,
+  marketContext,
+  chartContext,
+  scannerContext,
+  strategyContext,
+  regimeAndDriftContext,
+  executionContext,
+  riskContext,
+  portfolioContext,
+  recommendationHistoryContext,
+  validationContext,
+  calibrationContext,
+  traderIntent,
+  inputManifestHash
+}</code></div></article>
+        <article class="card"><h3>Execution context</h3><div class="contract"><code>ExecutionContext {
+  observedAt,
+  bestBid,
+  bestAsk,
+  depthSnapshotRef,
+  proposedQuantity,
+  estimatedFillPrice,
+  spreadBps,
+  estimatedSlippageBps,
+  feesAndTaxes,
+  estimatedMarketImpactBps,
+  decisionToOrderLatencyMs,
+  entryFeasibility,
+  exitFeasibility,
+  contextExpiry
+}</code></div></article>
+      </div>
+      <div class="callout"><strong>Implementation order:</strong> point-in-time manifest and outcome contract → live quote/depth capture → realistic replay/validation → regime/drift and calibration → shadow mode → Guardian integration.</div>
+    </section>
+
+    <section id="sources" class="source-index">
+      <h2>Architecture and Mermaid source index</h2><div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Purpose</th></tr></thead><tbody>
+        <tr><td><a href="AI-Decision-Intelligence-Architecture-v0.2.md">AI-Decision-Intelligence-Architecture-v0.2.md</a></td><td>Authoritative written architecture and contracts.</td></tr>
+        <tr><td><a href="diagrams/ai-decision-intelligence-architecture-v0.2.mmd">ai-decision-intelligence-architecture-v0.2.mmd</a></td><td>Complete architecture.</td></tr>
+        <tr><td><a href="diagrams/decision-readiness-validation-loop-v0.2.mmd">decision-readiness-validation-loop-v0.2.mmd</a></td><td>New quality, regime, execution, validation and calibration loop.</td></tr>
+        <tr><td><a href="diagrams/trade-guardian-reassessment-lifecycle-v0.2.mmd">trade-guardian-reassessment-lifecycle-v0.2.mmd</a></td><td>Continuous reassessment.</td></tr>
+        <tr><td><a href="diagrams/learning-intelligence-accountability-v0.2.mmd">learning-intelligence-accountability-v0.2.mmd</a></td><td>History, validation and drift feedback.</td></tr>
+        <tr><td><a href="diagrams/strict-win-loss-evaluation-v0.2.mmd">strict-win-loss-evaluation-v0.2.mmd</a></td><td>Binary outcome and broader model-health metrics.</td></tr>
+      </tbody></table></div>
+    </section>
+  </main>
+  <footer><div class="shell">PredictiveEdge · AI recommends. The trader decides. · Architecture v0.2</div></footer>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    document.querySelectorAll('.diagram-card').forEach(card=>{
+      const rendered=card.querySelector('.mermaid');
+      let panel=card.querySelector('.source-panel');
+      if(!panel){
+        panel=document.createElement('div');panel.className='source-panel';
+        panel.innerHTML='<details><summary>View exact Mermaid source</summary><div class="code-wrap"><button class="copy">Copy</button><pre class="source"><code data-from-rendered></code></pre></div></details>';
+        card.appendChild(panel);
+      }
+      const target=panel.querySelector('[data-from-rendered]');
+      if(target&&rendered){target.textContent=rendered.textContent.trim()}
+    });
+    const dark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if(window.mermaid){mermaid.initialize({startOnLoad:true,securityLevel:'loose',theme:dark?'dark':'default',flowchart:{htmlLabels:true,curve:'basis',useMaxWidth:true}})}
+    document.querySelectorAll('.copy').forEach(button=>button.addEventListener('click',async()=>{const source=button.closest('.code-wrap').querySelector('code').textContent;try{await navigator.clipboard.writeText(source);const previous=button.textContent;button.textContent='Copied';setTimeout(()=>button.textContent=previous,1400)}catch(error){button.textContent='Select source'}}));
+  </script>
+</body>
+</html>

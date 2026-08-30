@@ -26,13 +26,20 @@ import org.predictiveedge.marketintelligence.domain.MarketBarValues;
 import org.predictiveedge.marketintelligence.domain.MarketSessionId;
 import org.predictiveedge.marketintelligence.domain.ObservationSubject;
 import org.predictiveedge.marketintelligence.domain.ObservationSubjectType;
+import org.predictiveedge.platform.eventing.application.DomainEventPublisher;
+import org.predictiveedge.platform.eventing.application.EventPublication;
+import org.predictiveedge.platform.eventing.contract.DataClassification;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class JdbcMarketIntelligenceStoreTest {
     @Test
     void appendsBarRevisionsAndRejectionsWithTenantIdentity() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        var store = new JdbcMarketIntelligenceStore(jdbc);
+        DomainEventPublisher events = mock(DomainEventPublisher.class);
+        UUID eventId = UUID.randomUUID();
+        var store = new JdbcMarketIntelligenceStore(jdbc, new ObjectMapper(), events, () -> eventId);
         UUID userId = UUID.randomUUID();
         Instant start = Instant.parse("2026-08-07T03:45:00Z");
         var key = new MarketBarKey(new ObservationSubject(ObservationSubjectType.INSTRUMENT, "NSE:INFY"),
@@ -56,5 +63,27 @@ class JdbcMarketIntelligenceStoreTest {
         verify(jdbc, times(2)).update(anyString(), arguments.capture());
         assertThat(arguments.getAllValues().getFirst()).contains(userId, "ZD123", "NSE:INFY");
         assertThat(arguments.getAllValues().getLast()).contains(userId, "ZD123", "DUPLICATE");
+
+        ArgumentCaptor<EventPublication> publication = ArgumentCaptor.forClass(EventPublication.class);
+        verify(events).stage(publication.capture());
+        var staged = publication.getValue();
+        var metadata = staged.event().metadata();
+        assertThat(staged.destinationTopic()).isEqualTo("pe.market-intelligence.v1");
+        assertThat(staged.event().classification()).isEqualTo(DataClassification.CONFIDENTIAL);
+        assertThat(metadata.eventId()).isEqualTo(eventId);
+        assertThat(metadata.eventType()).isEqualTo("MarketIntelligence.MarketBarRevisionPublished");
+        assertThat(metadata.aggregateType()).isEqualTo("MarketBar");
+        assertThat(metadata.aggregateId()).matches("[0-9a-f]{64}");
+        assertThat(metadata.partitionKey()).isEqualTo(metadata.aggregateId());
+        assertThat(metadata.aggregateVersion()).isEqualTo(1);
+        assertThat(metadata.effectiveAt()).isEqualTo(start.plusSeconds(60));
+        assertThat(metadata.availableAt()).isEqualTo(start.plusSeconds(62));
+        assertThat(metadata.accountId()).isEqualTo("ZD123");
+        assertThat(metadata.evidenceManifestRef()).isEqualTo("a".repeat(64));
+        var payload = staged.event().payload();
+        assertThat(payload.get("userId").asText()).isEqualTo(userId.toString());
+        assertThat(payload.get("subjectId").asText()).isEqualTo("NSE:INFY");
+        assertThat(payload.get("close").decimalValue()).isEqualByComparingTo("105");
+        assertThat(payload.get("finalityState").asText()).isEqualTo("FINAL");
     }
 }

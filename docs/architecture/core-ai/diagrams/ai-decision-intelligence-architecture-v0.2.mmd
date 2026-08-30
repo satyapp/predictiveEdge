@@ -1,0 +1,116 @@
+flowchart TB
+    subgraph EXT["External and user facts"]
+        MD["Historical candles + live ticks + depth"]
+        NE["Timestamped news + corporate disclosures"]
+        GR["Government + regulatory sources"]
+        AC["Account + positions"]
+        TI["Trader Intent"]
+    end
+
+    DQ["Point-in-Time Data Quality Intelligence\ncutoffs + lineage + freshness + leakage controls"]
+    MD --> DQ
+    NE --> DQ
+    GR --> DQ
+    AC --> DQ
+    TI --> DQ
+
+    subgraph MI["Market Intelligence"]
+        MDC["Market data + microstructure"]
+        NEC["News + event"]
+        CAC["Corporate action + issuer + fundamental"]
+        SEC["Sector"]
+        MRC["Macro + government + regulatory"]
+        ELC["Session + calendar + eligibility"]
+        MC["Immutable point-in-time MarketContext"]
+        MDC --> MC
+        NEC --> MC
+        CAC --> MC
+        SEC --> MC
+        MRC --> MC
+        ELC --> MC
+    end
+
+    DQ --> MDC
+    DQ --> NEC
+    DQ --> CAC
+    DQ --> MRC
+    MC --> CI["Chart Intelligence"]
+    MC --> SI["Scanner Intelligence"]
+    MC --> STI["Strategy Intelligence"]
+    MC --> RDI["Regime + Drift Intelligence"]
+    MC --> EI["Execution Intelligence\nspread + depth + fill + slippage + latency"]
+    MC --> RI["Risk Intelligence - mandatory"]
+    MC --> PI["Portfolio Intelligence - mandatory"]
+    AC --> RI
+    AC --> PI
+
+    LI["Learning Intelligence - mandatory\ncomparable decisions + outcomes"]
+    VI["Validation Intelligence - mandatory\nwalk-forward + holdout + cost-aware evidence"]
+    CAL["Calibration Intelligence - mandatory\nprobability + uncertainty + expected value after costs"]
+    PHASE["Discovery orchestration\nPRE_MARKET | LIVE_MARKET | POST_MARKET"]
+
+    LI --> VI
+    RDI --> VI
+    STI --> VI
+    VI --> CAL
+    EI --> CAL
+
+    subgraph BUNDLE["Point-in-time AITradingDecisionInputBundle"]
+        B["Market + Chart + Scanner + Strategy + Regime\nExecution + Validation + Calibration\nRisk + Portfolio + Learning + Trader Intent\ncausal evidence manifest"]
+    end
+
+    DQ --> B
+    MC --> B
+    CI --> B
+    SI --> B
+    STI --> B
+    RDI --> B
+    EI --> B
+    RI --> B
+    PI --> B
+    LI --> B
+    VI --> B
+    CAL --> B
+    TI --> B
+    PHASE --> B
+
+    B --> READY{"All mandatory resources current,\ncausal, validated and same user?"}
+    READY -->|"No"| IE["INSUFFICIENT_EVIDENCE / DATA_STALE"]
+    READY -->|"Yes"| AI["AI Decision Intelligence\nsole recommendation authority"]
+
+    AI --> REC["Structured AI recommendation\nentry window + horizon + stop + targets\nprobability + uncertainty + failure clarification"]
+    REC --> EV{"Positive expected value after costs\nand confidence above policy threshold?"}
+    CAL --> EV
+    EI --> EV
+    EV -->|"No"| ABSTAIN["NO_TRADE / WAIT"]
+    EV -->|"Yes"| VAL["Deterministic policy validator\nchecks; never invents a recommendation"]
+    RI --> VAL
+    PI --> VAL
+    EI --> VAL
+    VI --> VAL
+    TI --> VAL
+
+    VAL -->|"Valid"| REVIEW["Trader review"]
+    VAL -->|"Violation"| REJECT["AI recommendation rejected"]
+    REVIEW -->|"Accept"| BROKER["Manual execution at broker"]
+    REVIEW -->|"Reject / watch"| CASE["Immutable learning case"]
+    BROKER --> TRADE["Actual fills + costs + registered trade state"]
+    TRADE --> TG["Trade Guardian\ncontinuous advisory evaluation"]
+    MC --> TG
+    RDI --> TG
+    EI --> TG
+    RI --> TG
+    PI --> TG
+    TG --> REASSESS["Fresh reassessment bundle\ncurrent trade + original chain + new cutoffs"]
+    REASSESS --> AI
+    TG --> REVIEW
+    TG --> CASE
+    REC --> CASE
+    REJECT --> CASE
+    ABSTAIN --> CASE
+    CASE --> LI
+    TRADE --> SCORE["Strict model outcome\nevery BUY/SELL => WIN or LOSS after costs"]
+    SCORE --> CASE
+    SCORE --> DRIFT["Live performance + calibration drift monitor"]
+    DRIFT --> RDI
+    DRIFT --> VI

@@ -1,0 +1,84 @@
+flowchart LR
+    subgraph SOURCES["Market and account facts"]
+        Z["Zerodha historical + live data"]
+        H["All available historical candles"]
+        L["Live ticks / finalized bars"]
+        A["Read-only account and positions"]
+        Z --> H
+        Z --> L
+        Z --> A
+    end
+
+    subgraph PHASES["Discovery lifecycle"]
+        PRE["Pre-market discovery"]
+        LIVE["Live-market validation"]
+        POST["Post-market evaluation"]
+        PRE --> LIVE
+        LIVE --> POST
+        POST -. "learning evidence" .-> PRE
+    end
+
+    H --> PRE
+    H --> POST
+    L --> LIVE
+
+    subgraph INTELLIGENCE["Governed intelligence modules"]
+        MI["Market Intelligence\ncanonical facts + features"]
+        CI["Chart Intelligence\nimplemented first producer"]
+        SI["Scanner Intelligence"]
+        STI["Strategy Intelligence"]
+        DI["Decision Intelligence"]
+        RI["Risk Intelligence\nhard gate"]
+        PI["Portfolio Intelligence\nhard gate"]
+        MI --> CI
+        MI --> SI
+        MI --> STI
+    end
+
+    PRE --> MI
+    LIVE --> MI
+    A --> PI
+    A --> RI
+
+    subgraph CONTRACT["Immutable IntelligenceFeedback contract"]
+        FB["action + confidence + readiness\ngate + causal cutoffs + evidence hash"]
+    end
+
+    CI --> FB
+    SI --> FB
+    STI --> FB
+    DI --> FB
+    RI --> FB
+    PI --> FB
+
+    TI["Active Trader Intent\npermitted instrument, direction, strategy, validity"]
+
+    subgraph TDS["Trading Decision System"]
+        Q["One-cutoff feedback query"]
+        E["Deterministic decision engine"]
+        M["Ordered evidence manifest\nSHA-256"]
+        Q --> E
+        E --> M
+    end
+
+    FB --> Q
+    TI --> E
+
+    M --> BUY["BUY / SELL recommendation"]
+    M --> WAIT["WAIT"]
+    M --> NT["NO_TRADE"]
+    M --> IE["INSUFFICIENT_EVIDENCE"]
+
+    BUY --> REVIEW["Trader review"]
+    WAIT --> REVIEW
+    NT --> REVIEW
+    IE --> REVIEW
+    REVIEW -->|"Trader accepts and executes manually"| BROKER["Broker application"]
+    REVIEW -->|"Reject / watch"| POST
+    BROKER --> REGISTER["Manual or read-only fill registration"]
+    REGISTER --> TG["Trade Guardian\nadvisory monitoring only"]
+    TG --> REVIEW
+    TG --> POST
+
+    RI -. "VETO cannot be overridden" .-> NT
+    PI -. "VETO cannot be overridden" .-> NT

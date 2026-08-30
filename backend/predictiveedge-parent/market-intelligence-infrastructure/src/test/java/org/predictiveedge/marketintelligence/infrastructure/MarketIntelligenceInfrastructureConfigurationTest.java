@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.predictiveedge.marketintelligence.domain.BarTimeframe;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 class MarketIntelligenceInfrastructureConfigurationTest {
     @Test
     void parsesConfiguredTimeframesCaseInsensitivelyAndDeduplicatesThem() {
@@ -36,5 +38,13 @@ class MarketIntelligenceInfrastructureConfigurationTest {
         var port = configuration.marketBarQueryPort(mock(JdbcTemplate.class));
 
         assertThat(configuration.marketBarQueryService(port)).isNotNull();
+    }
+
+    @Test
+    void wiresLowCardinalityOperationalMetrics() {
+        var configuration = new MarketIntelligenceInfrastructureConfiguration();
+
+        assertThat(configuration.marketIntelligenceMetrics(new SimpleMeterRegistry()))
+                .isInstanceOf(MicrometerMarketIntelligenceMetrics.class);
     }
 }

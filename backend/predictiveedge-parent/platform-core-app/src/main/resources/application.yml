@@ -89,6 +89,12 @@ predictiveedge:
     finality-policy-version: ${PE_MARKET_INTELLIGENCE_FINALITY_POLICY_VERSION:finality-v1}
     session-retention: ${PE_MARKET_INTELLIGENCE_SESSION_RETENTION:PT24H}
     retention-sweep-milliseconds: ${PE_MARKET_INTELLIGENCE_RETENTION_SWEEP_MILLISECONDS:60000}
+  shadow-decision:
+    enabled: ${PE_SHADOW_DECISION_ENABLED:false}
+    user-id: ${PE_SHADOW_USER_ID:}
+    venue: ${PE_SHADOW_VENUE:NSE}
+    instrument-id: ${PE_SHADOW_INSTRUMENT_ID:}
+    minimum-directional-probability: ${PE_SHADOW_MINIMUM_DIRECTIONAL_PROBABILITY:0.55}
 management:
   endpoint:
     health:

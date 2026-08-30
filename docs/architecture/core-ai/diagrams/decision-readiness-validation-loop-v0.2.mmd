@@ -1,0 +1,41 @@
+flowchart TB
+    DATA["Point-in-time data quality\ncausal cutoff + lineage + freshness"]
+    REGIME["Regime + Drift Intelligence"]
+    SIGNALS["Market + Chart + Scanner + Strategy"]
+    EXEC["Execution Intelligence\nfill + spread + slippage + latency"]
+    VALID["Validation Intelligence\nwalk-forward + holdout + costs"]
+    CAL["Calibration Intelligence\nprobability + uncertainty + net expectancy"]
+    AI["AI Decision Intelligence"]
+    GATE{"Positive edge after costs\nand policy confidence met?"}
+    ABSTAIN["NO_TRADE | WAIT | INSUFFICIENT_EVIDENCE"]
+    POLICY["Risk + Portfolio + eligibility validator"]
+    TRADER["Trader review and manual execution"]
+    OUTCOME["Strict WIN / LOSS + actual P&L"]
+    LEARN["Learning Intelligence"]
+    MONITOR["Performance + calibration drift"]
+
+    DATA --> REGIME
+    DATA --> SIGNALS
+    DATA --> EXEC
+    REGIME --> SIGNALS
+    SIGNALS --> VALID
+    REGIME --> VALID
+    VALID --> CAL
+    EXEC --> CAL
+    SIGNALS --> AI
+    REGIME --> AI
+    EXEC --> AI
+    VALID --> AI
+    CAL --> AI
+    AI --> GATE
+    CAL --> GATE
+    GATE -->|"No"| ABSTAIN
+    GATE -->|"Yes"| POLICY
+    POLICY --> TRADER
+    TRADER --> OUTCOME
+    ABSTAIN --> LEARN
+    OUTCOME --> LEARN
+    LEARN --> VALID
+    OUTCOME --> MONITOR
+    MONITOR --> REGIME
+    MONITOR --> CAL

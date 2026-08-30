@@ -13,6 +13,7 @@ public final class PlatformKafkaTopics {
     public static final String MARKET_DATA_TRADES = "pe.market-data.trades.v1";
     public static final String MARKET_DATA_QUOTES = "pe.market-data.quotes.v1";
     public static final String MARKET_DATA_BARS = "pe.market-data.bars.v1";
+    public static final String MARKET_INTELLIGENCE = "pe.market-intelligence.v1";
     public static final String MARKET_CONTEXT = "pe.market-context.v1";
     public static final String CHART_CONTEXT = "pe.chart-context.v1";
     public static final String DECISIONS = "pe.decisions.v1";
@@ -26,6 +27,7 @@ public final class PlatformKafkaTopics {
             MARKET_DATA_TRADES,
             MARKET_DATA_QUOTES,
             MARKET_DATA_BARS,
+            MARKET_INTELLIGENCE,
             MARKET_CONTEXT,
             CHART_CONTEXT,
             DECISIONS,

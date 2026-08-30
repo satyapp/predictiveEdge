@@ -1,0 +1,34 @@
+flowchart TB
+    REPO["Mandatory Decision / Outcome Repository"]
+    QUERY["Point-in-time comparable-case query"]
+    HISTORY["RecommendationHistoryContext\nWIN/LOSS + executed P&L + net expectancy\nregime + confidence-bucket performance"]
+    CURRENT["Current Market + Chart + Scanner + Strategy\nRegime + Execution + Validation + Calibration\nRisk + Portfolio + Trader Intent"]
+    AI["AI Decision Intelligence"]
+    DISCLOSE["Required historical disclosure\nsample size + success ratio + failure clarification"]
+    VALIDATE["Validator checks history references and disclosure"]
+    TRADER["Trader: ACCEPT | REJECT | WATCH"]
+    FEEDBACK["Trader feedback + reason"]
+    OUTCOME["Resolved AI outcome\nWIN or LOSS"]
+    DRIFT["Performance + execution + calibration drift"]
+    REVALIDATE["Validation status\nAPPROVED | RESTRICTED | SHADOW_ONLY | BLOCKED"]
+
+    REPO --> QUERY
+    QUERY --> HISTORY
+    HISTORY --> AI
+    CURRENT --> AI
+    AI --> DISCLOSE
+    DISCLOSE --> VALIDATE
+    HISTORY --> VALIDATE
+    VALIDATE --> TRADER
+    TRADER --> FEEDBACK
+    DISCLOSE --> OUTCOME
+    FEEDBACK --> REPO
+    OUTCOME --> REPO
+    OUTCOME --> DRIFT
+    DRIFT --> REVALIDATE
+    REVALIDATE --> CURRENT
+
+    LOW["Example: 10 resolved recommendations\n2 wins / 8 losses = 20% success"]
+    LOW --> HISTORY
+    HISTORY --> CLARIFY["AI must explain evidence-backed failures\nand current similarities / differences"]
+    CLARIFY --> DISCLOSE
