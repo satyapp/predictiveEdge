@@ -22,6 +22,11 @@ public class TradingDecisionInfrastructureConfiguration {
     }
 
     @Bean
+    JdbcDecisionSafetySnapshotStore jdbcDecisionSafetySnapshotStore(JdbcTemplate jdbc, ObjectMapper json) {
+        return new JdbcDecisionSafetySnapshotStore(jdbc, json);
+    }
+
+    @Bean
     MarketContextDecisionResourceQuery marketContextDecisionResourceQuery(
             MarketContextQueryPort contexts,
             @Value("${predictiveedge.shadow-decision.market-context-horizon:INTRADAY}") String horizon) {
@@ -31,5 +36,20 @@ public class TradingDecisionInfrastructureConfiguration {
     @Bean
     ChartDecisionResourceQuery chartDecisionResourceQuery(ChartSnapshotQueryPort snapshots) {
         return new ChartDecisionResourceQuery(snapshots);
+    }
+
+    @Bean
+    RiskDecisionResourceQuery riskDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
+        return new RiskDecisionResourceQuery(snapshots);
+    }
+
+    @Bean
+    PortfolioDecisionResourceQuery portfolioDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
+        return new PortfolioDecisionResourceQuery(snapshots);
+    }
+
+    @Bean
+    ExecutionDecisionResourceQuery executionDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
+        return new ExecutionDecisionResourceQuery(snapshots);
     }
 }

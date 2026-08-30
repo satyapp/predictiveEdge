@@ -94,8 +94,17 @@ PostgreSQL stores. Their queries enforce analysis, knowledge and availability
 cutoffs in SQL, retain expired snapshots for replay, and allow the decision
 resource adapters to distinguish stale evidence from missing evidence.
 
-The next bounded task is to add factual Execution, Risk and Portfolio snapshot
-sources. Scanner, Strategy, Learning, Data Quality, Regime/Drift, Validation and
-Calibration follow the same contributor contract. Only after a complete batch
-can be produced and replayed should a structured AI provider adapter be
-implemented behind `AiRecommendationGateway`.
+Execution, Risk and Portfolio now have factual point-in-time contracts and
+tenant-owned, append-only PostgreSQL stores. Risk and Portfolio must explicitly
+return `PASS` or `VETO`; missing evidence is represented as `UNAVAILABLE` plus
+`VETO`. A pass cannot contradict exhausted risk capacity or a known portfolio
+concentration breach. Execution derives its gate only from recorded entry and
+exit feasibility. None of these resources creates a trade direction.
+
+The next bounded task is to populate these snapshots from broker account and
+market-depth observations. The Zerodha full-packet decoder currently ignores
+its ten depth entries, so bid/ask depth must be normalized before Execution can
+be considered factual. Scanner, Strategy, Learning, Data Quality, Regime/Drift,
+Validation and Calibration then follow the same contributor contract. Only
+after a complete batch can be produced and replayed should a structured AI
+provider adapter be implemented behind `AiRecommendationGateway`.
