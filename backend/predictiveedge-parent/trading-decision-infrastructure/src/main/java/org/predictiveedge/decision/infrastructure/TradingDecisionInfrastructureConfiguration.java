@@ -1,9 +1,16 @@
 package org.predictiveedge.decision.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Clock;
+import java.time.Duration;
 import org.predictiveedge.chart.application.ChartSnapshotQueryPort;
+import org.predictiveedge.decision.application.AiEvidencePayloadQuery;
+import org.predictiveedge.decision.application.AiRecommendationGateway;
 import org.predictiveedge.marketintelligence.application.MarketContextQueryPort;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,6 +31,11 @@ public class TradingDecisionInfrastructureConfiguration {
     @Bean
     JdbcDecisionSafetySnapshotStore jdbcDecisionSafetySnapshotStore(JdbcTemplate jdbc, ObjectMapper json) {
         return new JdbcDecisionSafetySnapshotStore(jdbc, json);
+    }
+
+    @Bean
+    JdbcAiEvidencePayloadStore jdbcAiEvidencePayloadStore(JdbcTemplate jdbc) {
+        return new JdbcAiEvidencePayloadStore(jdbc);
     }
 
     @Bean
@@ -51,5 +63,38 @@ public class TradingDecisionInfrastructureConfiguration {
     @Bean
     ExecutionDecisionResourceQuery executionDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
         return new ExecutionDecisionResourceQuery(snapshots);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "predictiveedge.ai", name = "provider", havingValue = "openai")
+    OpenAiRecommendationGateway openAiRecommendationGateway(
+            ObjectMapper json,
+            @Value("${predictiveedge.ai.openai.api-key:}") String apiKey,
+            @Value("${predictiveedge.ai.openai.model:gpt-5.4-mini}") String model,
+            @Value("${predictiveedge.ai.openai.endpoint:https://api.openai.com/v1/responses}") URI endpoint,
+            @Value("${predictiveedge.ai.openai.timeout-seconds:45}") long timeoutSeconds,
+            AiEvidencePayloadQuery evidencePayloadQuery) {
+        Duration timeout = Duration.ofSeconds(timeoutSeconds);
+        var http = HttpClient.newBuilder().connectTimeout(timeout).build();
+        return new OpenAiRecommendationGateway(json, new JdkOpenAiResponsesTransport(http, endpoint, timeout),
+                "openai", apiKey, model, evidencePayloadQuery, Clock.systemUTC(), () -> UUID.randomUUID().toString());
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "predictiveedge.ai", name = "provider", havingValue = "ollama")
+    AiRecommendationGateway ollamaRecommendationGateway(
+            ObjectMapper json,
+            @Value("${predictiveedge.ai.ollama.model:qwen3:8b}") String model,
+            @Value("${predictiveedge.ai.ollama.endpoint:http://localhost:11434/api/chat}") URI endpoint,
+            @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
+            @Value("${predictiveedge.ai.ollama.context-window-tokens:32768}") int contextWindowTokens,
+            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int maximumOutputTokens,
+            AiEvidencePayloadQuery evidencePayloadQuery) {
+        Duration timeout = Duration.ofSeconds(timeoutSeconds);
+        var http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        return new OpenAiRecommendationGateway(json, new OllamaResponsesTransport(json, http, endpoint, timeout,
+                contextWindowTokens, maximumOutputTokens),
+                "ollama", "local-ollama", model, evidencePayloadQuery, Clock.systemUTC(),
+                () -> UUID.randomUUID().toString());
     }
 }

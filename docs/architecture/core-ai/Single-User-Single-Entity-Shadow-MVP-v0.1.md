@@ -83,11 +83,41 @@ no broker-write port.
 
 ## Intentionally not implemented in this slice
 
-- a production AI provider adapter;
 - automated broker execution;
 - a UI/API for starting evaluations;
 - multi-user or multi-equity configuration; and
 - automatic promotion from shadow to manual/live use.
+
+## AI provider environments
+
+The recommendation boundary now supports two explicitly selected structured-output
+providers behind the same `AiRecommendationGateway` contract:
+
+- Development: `PE_AI_PROVIDER=ollama`, using the local Ollama `/api/chat`
+  endpoint and a configured local model (currently `qwen3:8b`).
+- QA/UAT: `PE_AI_PROVIDER=openai`, using the OpenAI Responses API and the
+  configured QA/UAT model.
+- Disabled: `PE_AI_PROVIDER=none` (the default runtime setting).
+
+There is no automatic provider fallback. An Ollama failure cannot silently send
+personal trading evidence to OpenAI, and an OpenAI failure cannot silently change
+the evaluated model. Provider, model, prompt, evidence hashes and output remain
+part of the decision audit trail.
+
+Before either provider is called, the gateway resolves the exact immutable JSON
+payload for all twelve mandatory evidence resources. Each payload must match its
+user, venue, instrument, resource type, payload reference, evidence hash and
+causal availability time. Missing, mismatched or invalid JSON fails closed.
+References alone are never treated as model evidence, and the gateway performs no
+silent truncation, sampling or omission. If a configured model cannot accept the
+complete governed payload within its external context limit, the decision is
+blocked instead of dropping evidence.
+
+The Ollama context window, structured-output allowance and inference timeout are
+explicit environment settings. Output is bounded because the recommendation
+schema is compact and unbounded generation is unsafe; input evidence is not
+trimmed to meet that output bound. A deployment must size the selected local
+model's context window for the complete governed input.
 
 `MarketContextSnapshot` and `ChartSnapshot` now have tenant-owned, append-only
 PostgreSQL stores. Their queries enforce analysis, knowledge and availability
@@ -101,10 +131,11 @@ return `PASS` or `VETO`; missing evidence is represented as `UNAVAILABLE` plus
 concentration breach. Execution derives its gate only from recorded entry and
 exit feasibility. None of these resources creates a trade direction.
 
-The next bounded task is to populate these snapshots from broker account and
-market-depth observations. The Zerodha full-packet decoder currently ignores
-its ten depth entries, so bid/ask depth must be normalized before Execution can
-be considered factual. Scanner, Strategy, Learning, Data Quality, Regime/Drift,
-Validation and Calibration then follow the same contributor contract. Only
-after a complete batch can be produced and replayed should a structured AI
-provider adapter be implemented behind `AiRecommendationGateway`.
+The next bounded task is to publish these snapshots into the exact AI evidence
+payload store from broker account and market-depth observations. The Zerodha
+full-packet decoder currently ignores its ten depth entries, so bid/ask depth
+must be normalized before Execution can be considered factual. Scanner,
+Strategy, Learning, Data Quality, Regime/Drift, Validation and Calibration then
+follow the same contributor and payload-publication contracts. Only after a
+complete batch can be produced and replayed should the shadow scheduler invoke
+either configured structured AI provider.
