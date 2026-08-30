@@ -64,6 +64,11 @@ public class MarketIntelligenceInfrastructureConfiguration {
     }
 
     @Bean
+    JdbcMarketContextStore jdbcMarketContextStore(JdbcTemplate jdbc, ObjectMapper json) {
+        return new JdbcMarketContextStore(jdbc, json);
+    }
+
+    @Bean
     MarketBarQueryService marketBarQueryService(MarketBarQueryPort bars) {
         return new MarketBarQueryService(bars);
     }

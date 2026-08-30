@@ -29,6 +29,7 @@
     <module>../trading-decision-domain</module>
     <module>../chart-intelligence-domain</module>
     <module>../chart-intelligence-application</module>
+    <module>../chart-intelligence-infrastructure</module>
     <module>../trading-decision-application</module>
     <module>../trading-decision-infrastructure</module>
     <module>../trade-guardian-domain</module>

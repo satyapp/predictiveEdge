@@ -74,6 +74,7 @@ PE_SHADOW_DECISION_ENABLED=true
 PE_SHADOW_USER_ID=<personal-user-uuid>
 PE_SHADOW_VENUE=NSE
 PE_SHADOW_INSTRUMENT_ID=<single-equity-instrument-id>
+PE_SHADOW_MARKET_CONTEXT_HORIZON=INTRADAY
 PE_SHADOW_MINIMUM_DIRECTIONAL_PROBABILITY=0.55
 ```
 
@@ -88,9 +89,13 @@ no broker-write port.
 - multi-user or multi-equity configuration; and
 - automatic promotion from shadow to manual/live use.
 
-The next bounded task is to implement the persistent point-in-time stores for
-`MarketContextSnapshot` and `ChartSnapshot`, then add factual Execution, Risk
-and Portfolio snapshot sources. Scanner, Strategy, Learning, Data Quality,
-Regime/Drift, Validation and Calibration follow the same contributor contract.
-Only after a complete batch can be produced and replayed should a structured AI
-provider adapter be implemented behind `AiRecommendationGateway`.
+`MarketContextSnapshot` and `ChartSnapshot` now have tenant-owned, append-only
+PostgreSQL stores. Their queries enforce analysis, knowledge and availability
+cutoffs in SQL, retain expired snapshots for replay, and allow the decision
+resource adapters to distinguish stale evidence from missing evidence.
+
+The next bounded task is to add factual Execution, Risk and Portfolio snapshot
+sources. Scanner, Strategy, Learning, Data Quality, Regime/Drift, Validation and
+Calibration follow the same contributor contract. Only after a complete batch
+can be produced and replayed should a structured AI provider adapter be
+implemented behind `AiRecommendationGateway`.
