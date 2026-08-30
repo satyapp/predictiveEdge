@@ -39,6 +39,18 @@ foreign-key boundary.
    - an entry window covered by current execution evidence.
 5. `ShadowOutcomeService` resolves each actionable recommendation as exactly
    `WIN` or `LOSS`. Breakeven, invalid entry and stop-first cases are losses.
+6. `ShadowEvidenceBatchService` captures one causal batch through exactly one
+   contributor for each of the twelve mandatory resource types. Missing or
+   duplicate contributors fail configuration; an unavailable source must be
+   represented explicitly and therefore blocks the later AI call.
+7. Initial source adapters now translate:
+   - the governed semantic `MarketContextSnapshot` into `MARKET`; and
+   - the immutable `ChartSnapshot` into `CHART`.
+
+   A raw market bar is deliberately not treated as complete Market
+   Intelligence. It remains upstream evidence for Market Context, which is
+   responsible for the broader market, news, corporate, sector and policy
+   dimensions defined by the architecture.
 
 ## Persistence
 
@@ -76,6 +88,9 @@ no broker-write port.
 - multi-user or multi-equity configuration; and
 - automatic promotion from shadow to manual/live use.
 
-The next bounded task is to adapt existing Market Intelligence, Chart
-Intelligence and user Risk/Portfolio snapshots into one `ShadowEvidenceBatch`,
-then implement a structured AI provider adapter behind `AiRecommendationGateway`.
+The next bounded task is to implement the persistent point-in-time stores for
+`MarketContextSnapshot` and `ChartSnapshot`, then add factual Execution, Risk
+and Portfolio snapshot sources. Scanner, Strategy, Learning, Data Quality,
+Regime/Drift, Validation and Calibration follow the same contributor contract.
+Only after a complete batch can be produced and replayed should a structured AI
+provider adapter be implemented behind `AiRecommendationGateway`.

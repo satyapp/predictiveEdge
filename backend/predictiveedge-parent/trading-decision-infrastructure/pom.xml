@@ -5,6 +5,8 @@
   <artifactId>trading-decision-infrastructure</artifactId>
   <dependencies>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>trading-decision-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>market-intelligence-application</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
     <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
