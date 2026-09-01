@@ -134,9 +134,20 @@ exit feasibility. None of these resources creates a trade direction.
 Zerodha FULL equity packets now preserve all five bid and five ask levels as
 provider-normalized, ordered depth entries on the immutable equity tick. Quantity
 is decoded as unsigned 32-bit data and order count as unsigned 16-bit data.
-This closes the packet-loss gap, but a governed depth snapshot and direction-aware
-fill calculation are still required before Execution can be produced directly
-from the live stream.
+Admitted, de-duplicated equity ticks now append their five-by-five book to
+`market_intelligence.market_depth_snapshot`. Each row is tenant/account scoped,
+SHA-256 hashed and selectable only when its receipt time is at or before the
+decision knowledge cutoff. This closes the governed depth-capture gap; a
+direction-aware fill and slippage policy is still required before Execution can
+be produced directly from the live stream.
+
+The Zerodha adapter also implements a deliberately read-only account snapshot
+provider over `GET /user/margins`, `GET /portfolio/positions` and
+`GET /portfolio/holdings`. The three responses are normalized as funds, net/day
+positions and holdings, captured as a bounded observation window, and append-
+stored in `broker_evidence.account_snapshot` with tenant/account identity and a
+deterministic evidence hash. The adapter exposes no order placement, position
+conversion or holdings-authorisation operation.
 
 When Market, Chart, Risk, Portfolio or Execution selects a factual snapshot for
 a causal decision batch, the exact snapshot JSON is append-published using the
@@ -144,9 +155,11 @@ same user, instrument, resource type, payload reference, evidence hash and
 availability time as its `DecisionResource`. Identical publication is idempotent;
 a conflicting JSON payload for the same identity fails closed.
 
-The next bounded task is to create governed depth snapshots and obtain Zerodha
-funds, positions and holdings so Execution, Risk and Portfolio can be produced
-from broker facts. Scanner, Strategy, Learning, Data Quality, Regime/Drift,
-Validation and Calibration then follow the same contributor and exact-payload
-contracts. Only after a complete twelve-resource batch can be produced and
-replayed should the shadow scheduler invoke either structured AI provider.
+The next bounded task is to derive Execution from depth plus an explicit trader
+direction, and to derive Risk and Portfolio from the latest broker evidence plus
+versioned personal risk/concentration policy. Missing, stale or contradictory
+facts must produce `UNAVAILABLE` and `VETO`. Scanner, Strategy, Learning, Data
+Quality, Regime/Drift, Validation and Calibration then follow the same contributor
+and exact-payload contracts. Only after a complete twelve-resource batch can be
+produced and replayed should the shadow scheduler invoke either structured AI
+provider.

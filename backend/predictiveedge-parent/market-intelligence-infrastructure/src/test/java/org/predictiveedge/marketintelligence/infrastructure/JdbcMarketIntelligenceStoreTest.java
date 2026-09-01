@@ -14,6 +14,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.predictiveedge.broker.domain.IndexMarketTick;
+import org.predictiveedge.broker.domain.EquityMarketTick;
+import org.predictiveedge.broker.domain.MarketDepthLevel;
 import org.predictiveedge.broker.domain.Instrument;
 import org.predictiveedge.marketintelligence.application.MarketTickRejection;
 import org.predictiveedge.marketintelligence.domain.BarFinalityState;
@@ -85,5 +87,31 @@ class JdbcMarketIntelligenceStoreTest {
         assertThat(payload.get("subjectId").asText()).isEqualTo("NSE:INFY");
         assertThat(payload.get("close").decimalValue()).isEqualByComparingTo("105");
         assertThat(payload.get("finalityState").asText()).isEqualTo("FINAL");
+    }
+
+    @Test
+    void appendsAHashedFiveByFiveDepthSnapshot() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var store = new JdbcMarketIntelligenceStore(jdbc, new ObjectMapper(),
+                mock(DomainEventPublisher.class), UUID::randomUUID);
+        UUID userId = UUID.randomUUID();
+        Instant exchangeAt = Instant.parse("2026-09-01T04:00:00Z");
+        var levels = java.util.stream.IntStream.rangeClosed(1, 5)
+                .mapToObj(position -> new MarketDepthLevel(position,
+                        new BigDecimal(101 - position), position * 10L, position)).toList();
+        var asks = java.util.stream.IntStream.rangeClosed(1, 5)
+                .mapToObj(position -> new MarketDepthLevel(position,
+                        new BigDecimal(100 + position), position * 20L, position)).toList();
+        var tick = new EquityMarketTick(new Instrument("NSE", "INFY"), "408065", new BigDecimal("100"),
+                1, new BigDecimal("99"), 10, 100, 100, new BigDecimal("98"), new BigDecimal("101"),
+                new BigDecimal("97"), new BigDecimal("99"), levels, asks, exchangeAt, exchangeAt,
+                exchangeAt.plusMillis(10));
+
+        store.publish(userId, "ZD123", tick);
+
+        ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(anyString(), arguments.capture());
+        assertThat(arguments.getValue()).contains(userId, "ZD123", "NSE", "INFY", "408065");
+        assertThat(arguments.getValue()[10].toString()).matches("[0-9a-f]{64}");
     }
 }

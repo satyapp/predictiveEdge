@@ -5,13 +5,20 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.predictiveedge.broker.domain.EquityMarketTick;
+import org.predictiveedge.broker.domain.Instrument;
+import org.predictiveedge.broker.domain.MarketDepthLevel;
 import org.predictiveedge.marketintelligence.application.MarketBarPublicationPort;
+import org.predictiveedge.marketintelligence.application.MarketDepthPublicationPort;
+import org.predictiveedge.marketintelligence.application.MarketDepthQueryPort;
+import org.predictiveedge.marketintelligence.application.MarketDepthSnapshot;
 import org.predictiveedge.marketintelligence.application.MarketTickRejection;
 import org.predictiveedge.marketintelligence.application.MarketTickRejectionPort;
 import org.predictiveedge.marketintelligence.domain.MarketBarKey;
@@ -29,7 +36,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Append-only PostgreSQL store for canonical bar revisions and rejected normalized ticks. */
-public class JdbcMarketIntelligenceStore implements MarketBarPublicationPort, MarketTickRejectionPort {
+public class JdbcMarketIntelligenceStore implements MarketBarPublicationPort, MarketTickRejectionPort,
+        MarketDepthPublicationPort, MarketDepthQueryPort {
     static final String TOPIC = "pe.market-intelligence.v1";
     static final String EVENT_TYPE = "MarketIntelligence.MarketBarRevisionPublished";
     private final JdbcTemplate jdbc;
@@ -87,6 +95,92 @@ public class JdbcMarketIntelligenceStore implements MarketBarPublicationPort, Ma
                 tick.instrument().exchange(), tick.instrument().symbol(), tick.providerInstrumentId(),
                 tick.lastPrice(), cumulativeVolume, Timestamp.from(tick.exchangeTimestamp()),
                 Timestamp.from(tick.receivedAt()), rejection.reason().name(), rejection.detail());
+    }
+
+    @Override
+    @Transactional
+    public void publish(UUID userId, String brokerAccountId, EquityMarketTick tick) {
+        Objects.requireNonNull(userId, "User id is required");
+        Objects.requireNonNull(tick, "Equity market tick is required");
+        String accountId = requiredAccount(brokerAccountId);
+        String buyJson = writeDepth(tick.buyDepth());
+        String sellJson = writeDepth(tick.sellDepth());
+        String evidenceHash = depthHash(userId, accountId, tick, buyJson, sellJson);
+        jdbc.update("""
+                insert into market_intelligence.market_depth_snapshot (
+                  snapshot_id,user_id,broker_account_id,venue,symbol,provider_instrument_id,
+                  exchange_timestamp,received_at,buy_depth_json,sell_depth_json,evidence_hash)
+                values (?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?)
+                on conflict (user_id,broker_account_id,provider_instrument_id,
+                             exchange_timestamp,received_at,evidence_hash) do nothing
+                """, UUID.randomUUID(), userId, accountId, tick.instrument().exchange(),
+                tick.instrument().symbol(), tick.providerInstrumentId(),
+                Timestamp.from(tick.exchangeTimestamp()), Timestamp.from(tick.receivedAt()),
+                buyJson, sellJson, evidenceHash);
+    }
+
+    @Override
+    public Optional<MarketDepthSnapshot> latestAtOrBefore(
+            UUID userId, String brokerAccountId, Instrument instrument, Instant knowledgeCutoff) {
+        Objects.requireNonNull(userId, "User id is required");
+        Objects.requireNonNull(instrument, "Instrument is required");
+        Objects.requireNonNull(knowledgeCutoff, "Knowledge cutoff is required");
+        List<MarketDepthSnapshot> rows = jdbc.query("""
+                select snapshot_id,user_id,broker_account_id,venue,symbol,provider_instrument_id,
+                       buy_depth_json::text,sell_depth_json::text,exchange_timestamp,received_at,evidence_hash
+                  from market_intelligence.market_depth_snapshot
+                 where user_id=? and broker_account_id=? and venue=? and symbol=? and received_at<=?
+                 order by received_at desc,exchange_timestamp desc limit 1
+                """, (result, row) -> new MarketDepthSnapshot(
+                        result.getObject("snapshot_id", UUID.class),
+                        result.getObject("user_id", UUID.class),
+                        result.getString("broker_account_id"),
+                        new Instrument(result.getString("venue"), result.getString("symbol")),
+                        result.getString("provider_instrument_id"),
+                        readDepth(result.getString("buy_depth_json")),
+                        readDepth(result.getString("sell_depth_json")),
+                        result.getTimestamp("exchange_timestamp").toInstant(),
+                        result.getTimestamp("received_at").toInstant(),
+                        result.getString("evidence_hash")),
+                userId, requiredAccount(brokerAccountId), instrument.exchange(), instrument.symbol(),
+                Timestamp.from(knowledgeCutoff));
+        return rows.stream().findFirst();
+    }
+
+    private String writeDepth(List<MarketDepthLevel> levels) {
+        try {
+            return json.writeValueAsString(levels);
+        } catch (Exception failure) {
+            throw new IllegalStateException("Market depth could not be serialized", failure);
+        }
+    }
+
+    private List<MarketDepthLevel> readDepth(String value) {
+        try {
+            return json.readerForListOf(MarketDepthLevel.class).readValue(value);
+        } catch (Exception failure) {
+            throw new IllegalStateException("Stored market depth could not be parsed", failure);
+        }
+    }
+
+    private static String depthHash(UUID userId, String accountId, EquityMarketTick tick,
+            String buyJson, String sellJson) {
+        StringBuilder canonical = new StringBuilder();
+        append(canonical, userId);
+        append(canonical, accountId);
+        append(canonical, tick.instrument().exchange());
+        append(canonical, tick.instrument().symbol());
+        append(canonical, tick.providerInstrumentId());
+        append(canonical, tick.exchangeTimestamp());
+        append(canonical, tick.receivedAt());
+        append(canonical, buyJson);
+        append(canonical, sellJson);
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.toString().getBytes(UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     private EventPublication publication(UUID userId, String accountId, MarketBarRevision revision) {

@@ -14,6 +14,7 @@ public class BrokerConnectionExceptionHandler {
     ResponseEntity<Map<String, String>> brokerFailure(BrokerConnectionFailure failure) {
         HttpStatus status = switch (failure.code()) {
             case NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case NOT_CONNECTED -> HttpStatus.CONFLICT;
             case ALREADY_CONNECTED -> HttpStatus.CONFLICT;
             case INVALID_STATE -> HttpStatus.BAD_REQUEST;
             case CONNECTION_FAILED -> HttpStatus.BAD_GATEWAY;

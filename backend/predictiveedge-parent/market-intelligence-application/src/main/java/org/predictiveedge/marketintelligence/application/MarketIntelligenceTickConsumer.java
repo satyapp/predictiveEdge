@@ -50,6 +50,7 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
     private final MarketSessionPort sessions;
     private final MarketBarPublicationPort publications;
     private final MarketTickRejectionPort rejections;
+    private final MarketDepthPublicationPort depthPublications;
     private final MarketIntelligenceMetricsPort metrics;
     private final List<BarTimeframe> timeframes;
     private final BarFinalityPolicy finalityPolicy;
@@ -63,7 +64,8 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
             Set<BarTimeframe> timeframes,
             BarFinalityPolicy finalityPolicy,
             String aggregationPolicyVersion) {
-        this(sessions, publications, rejections, MarketIntelligenceMetricsPort.noop(), timeframes,
+        this(sessions, publications, rejections, MarketDepthPublicationPort.noop(),
+                MarketIntelligenceMetricsPort.noop(), timeframes,
                 finalityPolicy, aggregationPolicyVersion);
     }
 
@@ -75,9 +77,23 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
             Set<BarTimeframe> timeframes,
             BarFinalityPolicy finalityPolicy,
             String aggregationPolicyVersion) {
+        this(sessions, publications, rejections, MarketDepthPublicationPort.noop(), metrics,
+                timeframes, finalityPolicy, aggregationPolicyVersion);
+    }
+
+    public MarketIntelligenceTickConsumer(
+            MarketSessionPort sessions,
+            MarketBarPublicationPort publications,
+            MarketTickRejectionPort rejections,
+            MarketDepthPublicationPort depthPublications,
+            MarketIntelligenceMetricsPort metrics,
+            Set<BarTimeframe> timeframes,
+            BarFinalityPolicy finalityPolicy,
+            String aggregationPolicyVersion) {
         this.sessions = Objects.requireNonNull(sessions, "Market session port is required");
         this.publications = Objects.requireNonNull(publications, "Market bar publication port is required");
         this.rejections = Objects.requireNonNull(rejections, "Tick rejection port is required");
+        this.depthPublications = Objects.requireNonNull(depthPublications, "Market depth publication port is required");
         this.metrics = Objects.requireNonNull(metrics, "Market-intelligence metrics port is required");
         Objects.requireNonNull(timeframes, "Bar timeframes are required");
         if (timeframes.isEmpty()) throw new IllegalArgumentException("At least one bar timeframe is required");
@@ -174,6 +190,9 @@ public final class MarketIntelligenceTickConsumer implements UserMarketDataListe
             }
             state.samples.add(tick);
             state.samples.sort(EVENT_ORDER);
+            if (tick instanceof EquityMarketTick equity) {
+                depthPublications.publish(userId, accountId, equity);
+            }
             state.advanceWatermark(tick.exchangeTimestamp());
             correctPublishedBars(state, userId, accountId, tick);
             finalizeReady(state, userId, accountId, tick.receivedAt());

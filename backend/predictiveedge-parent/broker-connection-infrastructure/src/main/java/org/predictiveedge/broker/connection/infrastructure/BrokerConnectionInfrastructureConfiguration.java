@@ -8,6 +8,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.predictiveedge.broker.connection.BrokerConnectionService;
+import org.predictiveedge.broker.connection.BrokerAccountEvidencePort;
+import org.predictiveedge.broker.connection.BrokerAccountSnapshotService;
 import org.predictiveedge.broker.connection.BrokerConnectionStore;
 import org.predictiveedge.broker.connection.CredentialCipher;
 import org.predictiveedge.broker.connection.UserMarketDataSubscriptionManager;
@@ -18,9 +20,11 @@ import org.predictiveedge.broker.zerodha.ZerodhaInstrumentResolver;
 import org.predictiveedge.broker.zerodha.ZerodhaLiveMarketDataProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaLoginClient;
 import org.predictiveedge.broker.zerodha.ZerodhaReconnectPolicy;
+import org.predictiveedge.broker.zerodha.ZerodhaAccountSnapshotProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionClient;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataProvider;
+import org.predictiveedge.broker.spi.BrokerAccountSnapshotProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataInstrumentResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -34,6 +38,17 @@ public class BrokerConnectionInfrastructureConfiguration {
     @Bean
     BrokerConnectionStore brokerConnectionStore(JdbcTemplate jdbc) {
         return new JdbcBrokerConnectionStore(jdbc);
+    }
+
+    @Bean
+    BrokerAccountEvidencePort brokerAccountEvidencePort(JdbcTemplate jdbc, ObjectMapper json) {
+        return new JdbcBrokerAccountEvidenceStore(jdbc, json);
+    }
+
+    @Bean
+    BrokerAccountSnapshotService brokerAccountSnapshotService(
+            BrokerAccountSnapshotProvider provider, BrokerAccountEvidencePort evidence) {
+        return new BrokerAccountSnapshotService(provider, evidence);
     }
 
     @Bean
@@ -54,6 +69,12 @@ public class BrokerConnectionInfrastructureConfiguration {
     @Bean
     JdkZerodhaTransport zerodhaTransport() {
         return new JdkZerodhaTransport(HttpClient.newBuilder().build());
+    }
+
+    @Bean
+    BrokerAccountSnapshotProvider zerodhaAccountSnapshotProvider(
+            ZerodhaSessionProvider sessions, JdkZerodhaTransport transport, ObjectMapper json) {
+        return new ZerodhaAccountSnapshotProvider(sessions, transport, json, Clock.systemUTC());
     }
 
     @Bean

@@ -3,10 +3,14 @@ flowchart LR
         Z["Zerodha historical + live data"]
         H["All available historical candles"]
         L["Live ticks / finalized bars"]
-        A["Read-only account and positions"]
+        D["Immutable 5x5 depth evidence"]
+        A["Read-only funds / positions / holdings"]
+        AE["Immutable account evidence"]
         Z --> H
         Z --> L
+        L --> D
         Z --> A
+        A --> AE
     end
 
     subgraph PHASES["Discovery lifecycle"]
@@ -21,6 +25,7 @@ flowchart LR
     H --> PRE
     H --> POST
     L --> LIVE
+    D --> LIVE
 
     subgraph INTELLIGENCE["Governed intelligence modules"]
         MI["Market Intelligence\ncanonical facts + features"]
@@ -37,8 +42,8 @@ flowchart LR
 
     PRE --> MI
     LIVE --> MI
-    A --> PI
-    A --> RI
+    AE --> PI
+    AE --> RI
 
     subgraph CONTRACT["Immutable IntelligenceFeedback contract"]
         FB["action + confidence + readiness\ngate + causal cutoffs + evidence hash"]

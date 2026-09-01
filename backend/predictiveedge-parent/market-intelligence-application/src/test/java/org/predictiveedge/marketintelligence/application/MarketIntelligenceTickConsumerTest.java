@@ -107,6 +107,26 @@ class MarketIntelligenceTickConsumerTest {
     }
 
     @Test
+    void publishesDepthOnlyAfterAnEquityTickIsAdmittedAndDeduplicated() {
+        List<EquityMarketTick> depth = new ArrayList<>();
+        var depthConsumer = new MarketIntelligenceTickConsumer(
+                (instrument, timestamp) -> Optional.of(session),
+                (userId, accountId, revision) -> { },
+                rejections::add,
+                (userId, accountId, tick) -> depth.add(tick),
+                metrics,
+                EnumSet.of(BarTimeframe.ONE_MINUTE),
+                new BarFinalityPolicy(Duration.ofSeconds(2), "finality-v1"), "tick-ohlcv-v1");
+        var admitted = tick("2026-08-07T03:45:10Z", "2026-08-07T03:45:10.100Z", "100", 10);
+
+        depthConsumer.onTicks(USER_ID, ACCOUNT_ID, List.of(admitted, admitted));
+
+        assertThat(depth).containsExactly(admitted);
+        assertThat(rejections).extracting(MarketTickRejection::reason)
+                .containsExactly(MarketTickRejection.Reason.DUPLICATE);
+    }
+
+    @Test
     void rejectsTicksWithoutAnEffectiveSession() {
         var withoutCalendar = new MarketIntelligenceTickConsumer(
                 (instrument, timestamp) -> Optional.empty(),

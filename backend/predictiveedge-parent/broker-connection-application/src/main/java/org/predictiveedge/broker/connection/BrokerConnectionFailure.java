@@ -10,5 +10,5 @@ public final class BrokerConnectionFailure extends RuntimeException {
 
     public Code code() { return code; }
 
-    public enum Code { NOT_CONFIGURED, ALREADY_CONNECTED, INVALID_STATE, CONNECTION_FAILED }
+    public enum Code { NOT_CONFIGURED, NOT_CONNECTED, ALREADY_CONNECTED, INVALID_STATE, CONNECTION_FAILED }
 }

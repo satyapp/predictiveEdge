@@ -11,6 +11,7 @@ import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
 import org.predictiveedge.marketintelligence.application.MarketBarPublicationPort;
 import org.predictiveedge.marketintelligence.application.MarketIntelligenceTickConsumer;
 import org.predictiveedge.marketintelligence.application.MarketIntelligenceMetricsPort;
+import org.predictiveedge.marketintelligence.application.MarketDepthPublicationPort;
 import org.predictiveedge.marketintelligence.application.MarketSessionPort;
 import org.predictiveedge.marketintelligence.application.MarketSessionCalendarService;
 import org.predictiveedge.marketintelligence.application.MarketSessionPublicationPort;
@@ -78,12 +79,13 @@ public class MarketIntelligenceInfrastructureConfiguration {
             MarketSessionPort sessions,
             MarketBarPublicationPort publications,
             MarketTickRejectionPort rejections,
+            MarketDepthPublicationPort depthPublications,
             MarketIntelligenceMetricsPort metrics,
             @Value("${predictiveedge.market-intelligence.timeframes:ONE_MINUTE,FIVE_MINUTES}") String timeframes,
             @Value("${predictiveedge.market-intelligence.allowed-lateness:PT2S}") Duration allowedLateness,
             @Value("${predictiveedge.market-intelligence.aggregation-policy-version:tick-ohlcv-v1}") String aggregationVersion,
             @Value("${predictiveedge.market-intelligence.finality-policy-version:finality-v1}") String finalityVersion) {
-        return new MarketIntelligenceTickConsumer(sessions, publications, rejections, metrics,
+        return new MarketIntelligenceTickConsumer(sessions, publications, rejections, depthPublications, metrics,
                 parseTimeframes(timeframes), new BarFinalityPolicy(allowedLateness, finalityVersion),
                 aggregationVersion);
     }

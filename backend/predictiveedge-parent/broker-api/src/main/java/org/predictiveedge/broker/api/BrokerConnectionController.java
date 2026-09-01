@@ -4,6 +4,9 @@ import java.net.URI;
 import java.util.Map;
 
 import org.predictiveedge.broker.connection.BrokerConnectionService;
+import org.predictiveedge.broker.connection.BrokerAccountSnapshotService;
+import org.predictiveedge.broker.connection.BrokerConnectionFailure;
+import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,8 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/broker/v1")
 public class BrokerConnectionController {
     private final BrokerConnectionService connections;
+    private final BrokerAccountSnapshotService accountSnapshots;
 
-    public BrokerConnectionController(BrokerConnectionService connections) { this.connections = connections; }
+    public BrokerConnectionController(
+            BrokerConnectionService connections, BrokerAccountSnapshotService accountSnapshots) {
+        this.connections = connections;
+        this.accountSnapshots = accountSnapshots;
+    }
 
     @GetMapping("/connections")
     public BrokerConnectionService.ConnectionOverview connections(
@@ -51,6 +59,25 @@ public class BrokerConnectionController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Explicit read-only probe used by the single-user shadow workflow. */
+    @PostMapping("/zerodha/account-snapshots")
+    public AccountSnapshotResponse captureAccountSnapshot(
+            @AuthenticationPrincipal AuthenticatedIdentity identity,
+            @RequestHeader("Authorization") String predictiveEdgeSession) {
+        var overview = connections.overview(identity.user().id(), predictiveEdgeSession);
+        if (!overview.zerodhaConnected() || overview.zerodhaAccountId() == null) {
+            throw new BrokerConnectionFailure(BrokerConnectionFailure.Code.NOT_CONNECTED,
+                    "Connect Zerodha before capturing account evidence");
+        }
+        var evidence = accountSnapshots.capture(BrokerContext.withoutCredentials(
+                identity.user().id(), overview.zerodhaAccountId()));
+        var snapshot = evidence.snapshot();
+        return new AccountSnapshotResponse(evidence.snapshotId().toString(), snapshot.accountId(),
+                snapshot.observedAt().toString(), snapshot.receivedAt().toString(), evidence.evidenceHash(),
+                snapshot.funds().keySet(), snapshot.netPositions().size(), snapshot.dayPositions().size(),
+                snapshot.holdings().size());
+    }
+
     @GetMapping("/zerodha/callback")
     public ResponseEntity<Void> callback(
             @RequestParam("state") String state,
@@ -58,4 +85,15 @@ public class BrokerConnectionController {
         URI redirect = connections.completeZerodhaConnection(state, requestToken);
         return ResponseEntity.status(302).location(redirect).build();
     }
+
+    public record AccountSnapshotResponse(
+            String snapshotId,
+            String brokerAccountId,
+            String observedAt,
+            String receivedAt,
+            String evidenceHash,
+            java.util.Set<String> fundSegments,
+            int netPositionCount,
+            int dayPositionCount,
+            int holdingCount) { }
 }
