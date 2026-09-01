@@ -15,9 +15,15 @@ import org.predictiveedge.decision.domain.ShadowScope;
 /** Translates a persisted chart snapshot into the AI-neutral decision-resource envelope. */
 public final class ChartDecisionResourceQuery implements DecisionResourceQuery {
     private final ChartSnapshotQueryPort snapshots;
+    private final ExactAiPayloadPublisher payloads;
 
     public ChartDecisionResourceQuery(ChartSnapshotQueryPort snapshots) {
+        this(snapshots, null);
+    }
+
+    public ChartDecisionResourceQuery(ChartSnapshotQueryPort snapshots, ExactAiPayloadPublisher payloads) {
         this.snapshots = Objects.requireNonNull(snapshots, "Chart snapshot query is required");
+        this.payloads = payloads;
     }
 
     @Override
@@ -31,8 +37,13 @@ public final class ChartDecisionResourceQuery implements DecisionResourceQuery {
         Objects.requireNonNull(cutoff, "Evidence cutoff is required");
         return snapshots.findLatest(scope.userId(), scope.instrument().venue(),
                         scope.instrument().instrumentId(), cutoff)
-                .map(snapshot -> map(scope, snapshot))
+                .map(snapshot -> publish(scope, snapshot))
                 .orElseGet(() -> unavailable(scope, cutoff));
+    }
+
+    private DecisionResource publish(ShadowScope scope, ChartSnapshot snapshot) {
+        DecisionResource resource = map(scope, snapshot);
+        return payloads == null ? resource : payloads.publish(scope, type(), resource, snapshot);
     }
 
     private static DecisionResource map(ShadowScope scope, ChartSnapshot snapshot) {

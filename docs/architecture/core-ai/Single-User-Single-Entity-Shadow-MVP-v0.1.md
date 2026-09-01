@@ -131,11 +131,22 @@ return `PASS` or `VETO`; missing evidence is represented as `UNAVAILABLE` plus
 concentration breach. Execution derives its gate only from recorded entry and
 exit feasibility. None of these resources creates a trade direction.
 
-The next bounded task is to publish these snapshots into the exact AI evidence
-payload store from broker account and market-depth observations. The Zerodha
-full-packet decoder currently ignores its ten depth entries, so bid/ask depth
-must be normalized before Execution can be considered factual. Scanner,
-Strategy, Learning, Data Quality, Regime/Drift, Validation and Calibration then
-follow the same contributor and payload-publication contracts. Only after a
-complete batch can be produced and replayed should the shadow scheduler invoke
-either configured structured AI provider.
+Zerodha FULL equity packets now preserve all five bid and five ask levels as
+provider-normalized, ordered depth entries on the immutable equity tick. Quantity
+is decoded as unsigned 32-bit data and order count as unsigned 16-bit data.
+This closes the packet-loss gap, but a governed depth snapshot and direction-aware
+fill calculation are still required before Execution can be produced directly
+from the live stream.
+
+When Market, Chart, Risk, Portfolio or Execution selects a factual snapshot for
+a causal decision batch, the exact snapshot JSON is append-published using the
+same user, instrument, resource type, payload reference, evidence hash and
+availability time as its `DecisionResource`. Identical publication is idempotent;
+a conflicting JSON payload for the same identity fails closed.
+
+The next bounded task is to create governed depth snapshots and obtain Zerodha
+funds, positions and holdings so Execution, Risk and Portfolio can be produced
+from broker facts. Scanner, Strategy, Learning, Data Quality, Regime/Drift,
+Validation and Calibration then follow the same contributor and exact-payload
+contracts. Only after a complete twelve-resource batch can be produced and
+replayed should the shadow scheduler invoke either structured AI provider.

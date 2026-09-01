@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.predictiveedge.broker.domain.EquityMarketTick;
 import org.predictiveedge.broker.domain.Instrument;
 import org.predictiveedge.broker.domain.IndexMarketTick;
+import org.predictiveedge.broker.domain.MarketDepthLevel;
 import org.predictiveedge.marketintelligence.domain.BarFinalityPolicy;
 import org.predictiveedge.marketintelligence.domain.BarFinalityState;
 import org.predictiveedge.marketintelligence.domain.BarTimeframe;
@@ -183,7 +184,8 @@ class MarketIntelligenceTickConsumerTest {
         var exchange = Instant.parse(exchangeAt);
         return new EquityMarketTick(INFY, "408065", last, 1, last, volume, 100, 100,
                 new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("50"),
-                new BigDecimal("99"), exchange, exchange, Instant.parse(receivedAt));
+                new BigDecimal("99"), MarketDepthLevel.emptyBook(), MarketDepthLevel.emptyBook(),
+                exchange, exchange, Instant.parse(receivedAt));
     }
 
     private static IndexMarketTick indexTick(Instrument instrument, String at, String price) {

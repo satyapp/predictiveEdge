@@ -2,6 +2,7 @@ package org.predictiveedge.broker.zerodha;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -36,6 +37,18 @@ class ZerodhaTickerPacketDecoderTest {
         assertThat(equity.cumulativeVolume()).isEqualTo(1_250_000);
         assertThat(equity.lastTradeTimestamp()).isEqualTo(EXCHANGE_AT.minusSeconds(1));
         assertThat(equity.exchangeTimestamp()).isEqualTo(EXCHANGE_AT);
+        assertThat(equity.buyDepth()).extracting("position", "price", "quantity", "orderCount")
+                .containsExactly(tuple(1, new java.math.BigDecimal("2500.4"), 1500L, 12),
+                        tuple(2, new java.math.BigDecimal("2500.3"), 1250L, 10),
+                        tuple(3, new java.math.BigDecimal("2500.2"), 1000L, 8),
+                        tuple(4, new java.math.BigDecimal("2500.1"), 750L, 6),
+                        tuple(5, new java.math.BigDecimal("2500"), 500L, 4));
+        assertThat(equity.sellDepth()).extracting("position", "price", "quantity", "orderCount")
+                .containsExactly(tuple(1, new java.math.BigDecimal("2500.6"), 1600L, 13),
+                        tuple(2, new java.math.BigDecimal("2500.7"), 1350L, 11),
+                        tuple(3, new java.math.BigDecimal("2500.8"), 1100L, 9),
+                        tuple(4, new java.math.BigDecimal("2500.9"), 850L, 7),
+                        tuple(5, new java.math.BigDecimal("2501"), 600L, 5));
         var index = (IndexMarketTick) ticks.get(1);
         assertThat(index.instrument()).isEqualTo(new Instrument("NSE", "INDIA VIX"));
         assertThat(index.lastPrice()).isEqualByComparingTo("13.75");
@@ -61,6 +74,17 @@ class ZerodhaTickerPacketDecoderTest {
                 .isInstanceOf(BrokerFailure.class).hasMessageContaining("unsubscribed");
     }
 
+    @Test
+    void failsClosedForAnOutOfOrderDepthBook() {
+        var malformedDepth = equityPacket();
+        malformedDepth.putInt(80, 250_050); // Second bid is above the first bid at offset 68.
+        malformedDepth.position(0);
+
+        assertThatThrownBy(() -> new ZerodhaTickerPacketDecoder(subscription())
+                .decode(frame(malformedDepth), RECEIVED_AT))
+                .isInstanceOf(BrokerFailure.class).hasMessageContaining("prices are not ordered");
+    }
+
     private static LiveMarketDataSubscription subscription() {
         return new LiveMarketDataSubscription(List.of(
                 new LiveMarketDataInstrument(new Instrument("NSE", "INFY"), Long.toString(EQUITY_TOKEN),
@@ -75,8 +99,15 @@ class ZerodhaTickerPacketDecoderTest {
                 .putInt(50_000).putInt(45_000).putInt(248_000).putInt(252_000).putInt(247_000).putInt(246_500)
                 .putInt((int) EXCHANGE_AT.minusSeconds(1).getEpochSecond()).putInt(0).putInt(0).putInt(0)
                 .putInt((int) EXCHANGE_AT.getEpochSecond());
-        value.position(184); // Remaining bytes are the ten zero-valued market-depth entries.
+        depth(value, new int[][] {{1500,250040,12},{1250,250030,10},{1000,250020,8},{750,250010,6},{500,250000,4},
+                {1600,250060,13},{1350,250070,11},{1100,250080,9},{850,250090,7},{600,250100,5}});
         return value.flip();
+    }
+
+    private static void depth(ByteBuffer target, int[][] levels) {
+        for (int[] level : levels) {
+            target.putInt(level[0]).putInt(level[1]).putShort((short) level[2]).putShort((short) 0);
+        }
     }
 
     private static ByteBuffer indexPacket() {

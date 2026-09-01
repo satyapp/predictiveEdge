@@ -29,7 +29,10 @@ public final class JdbcAiEvidencePayloadStore implements AiResourcePayloadPublic
                 insert into decision.ai_resource_payload (
                   user_id,venue,instrument_id,resource_type,payload_ref,evidence_hash,available_at,payload_json)
                 values (?,?,?,?,?,?,?,?::jsonb)
-                on conflict do nothing
+                on conflict (user_id,venue,instrument_id,resource_type,payload_ref,evidence_hash)
+                do update set payload_json=excluded.payload_json
+                where decision.ai_resource_payload.payload_json=excluded.payload_json
+                  and decision.ai_resource_payload.available_at=excluded.available_at
                 """, scope.userId(), scope.instrument().venue(), scope.instrument().instrumentId(), type.name(),
                 required(payloadRef, "Payload reference"), hash(evidenceHash), Timestamp.from(availableAt),
                 required(payloadJson, "Payload JSON")) == 1;

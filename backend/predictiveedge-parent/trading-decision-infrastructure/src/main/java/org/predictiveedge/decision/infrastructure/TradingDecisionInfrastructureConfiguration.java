@@ -39,30 +39,40 @@ public class TradingDecisionInfrastructureConfiguration {
     }
 
     @Bean
+    ExactAiPayloadPublisher exactAiPayloadPublisher(ObjectMapper json, JdbcAiEvidencePayloadStore payloads) {
+        return new ExactAiPayloadPublisher(json, payloads);
+    }
+
+    @Bean
     MarketContextDecisionResourceQuery marketContextDecisionResourceQuery(
             MarketContextQueryPort contexts,
+            ExactAiPayloadPublisher payloads,
             @Value("${predictiveedge.shadow-decision.market-context-horizon:INTRADAY}") String horizon) {
-        return new MarketContextDecisionResourceQuery(contexts, horizon);
+        return new MarketContextDecisionResourceQuery(contexts, horizon, payloads);
     }
 
     @Bean
-    ChartDecisionResourceQuery chartDecisionResourceQuery(ChartSnapshotQueryPort snapshots) {
-        return new ChartDecisionResourceQuery(snapshots);
+    ChartDecisionResourceQuery chartDecisionResourceQuery(
+            ChartSnapshotQueryPort snapshots, ExactAiPayloadPublisher payloads) {
+        return new ChartDecisionResourceQuery(snapshots, payloads);
     }
 
     @Bean
-    RiskDecisionResourceQuery riskDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
-        return new RiskDecisionResourceQuery(snapshots);
+    RiskDecisionResourceQuery riskDecisionResourceQuery(
+            JdbcDecisionSafetySnapshotStore snapshots, ExactAiPayloadPublisher payloads) {
+        return new RiskDecisionResourceQuery(snapshots, payloads);
     }
 
     @Bean
-    PortfolioDecisionResourceQuery portfolioDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
-        return new PortfolioDecisionResourceQuery(snapshots);
+    PortfolioDecisionResourceQuery portfolioDecisionResourceQuery(
+            JdbcDecisionSafetySnapshotStore snapshots, ExactAiPayloadPublisher payloads) {
+        return new PortfolioDecisionResourceQuery(snapshots, payloads);
     }
 
     @Bean
-    ExecutionDecisionResourceQuery executionDecisionResourceQuery(JdbcDecisionSafetySnapshotStore snapshots) {
-        return new ExecutionDecisionResourceQuery(snapshots);
+    ExecutionDecisionResourceQuery executionDecisionResourceQuery(
+            JdbcDecisionSafetySnapshotStore snapshots, ExactAiPayloadPublisher payloads) {
+        return new ExecutionDecisionResourceQuery(snapshots, payloads);
     }
 
     @Bean

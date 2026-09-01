@@ -13,17 +13,28 @@ import org.predictiveedge.decision.domain.ShadowScope;
 
 public final class ExecutionDecisionResourceQuery implements DecisionResourceQuery {
     private final ExecutionEvidenceQueryPort snapshots;
+    private final ExactAiPayloadPublisher payloads;
 
     public ExecutionDecisionResourceQuery(ExecutionEvidenceQueryPort snapshots) {
+        this(snapshots, null);
+    }
+
+    public ExecutionDecisionResourceQuery(ExecutionEvidenceQueryPort snapshots, ExactAiPayloadPublisher payloads) {
         this.snapshots = Objects.requireNonNull(snapshots, "Execution evidence query is required");
+        this.payloads = payloads;
     }
 
     @Override public DecisionResourceType type() { return DecisionResourceType.EXECUTION; }
 
     @Override
     public DecisionResource findLatest(ShadowScope scope, Instant cutoff) {
-        return snapshots.findLatestEvidence(scope, cutoff).map(snapshot -> map(scope, cutoff, snapshot))
+        return snapshots.findLatestEvidence(scope, cutoff).map(snapshot -> publish(scope, cutoff, snapshot))
                 .orElseGet(() -> unavailable(scope, cutoff));
+    }
+
+    private DecisionResource publish(ShadowScope scope, Instant cutoff, ExecutionEvidenceSnapshot snapshot) {
+        DecisionResource resource = map(scope, cutoff, snapshot);
+        return payloads == null ? resource : payloads.publish(scope, type(), resource, snapshot);
     }
 
     private static DecisionResource map(ShadowScope scope, Instant cutoff, ExecutionEvidenceSnapshot snapshot) {

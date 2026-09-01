@@ -19,10 +19,17 @@ import org.predictiveedge.marketintelligence.domain.QualityDisposition;
 public final class MarketContextDecisionResourceQuery implements DecisionResourceQuery {
     private final MarketContextQueryPort marketContexts;
     private final String horizon;
+    private final ExactAiPayloadPublisher payloads;
 
     public MarketContextDecisionResourceQuery(MarketContextQueryPort marketContexts, String horizon) {
+        this(marketContexts, horizon, null);
+    }
+
+    public MarketContextDecisionResourceQuery(
+            MarketContextQueryPort marketContexts, String horizon, ExactAiPayloadPublisher payloads) {
         this.marketContexts = Objects.requireNonNull(marketContexts, "Market Context query is required");
         this.horizon = required(horizon, "Market Context horizon");
+        this.payloads = payloads;
     }
 
     @Override
@@ -37,8 +44,14 @@ public final class MarketContextDecisionResourceQuery implements DecisionResourc
         MarketContextKey key = new MarketContextKey(ContextScopeType.INSTRUMENT,
                 scope.instrument().instrumentId(), horizon);
         return marketContexts.findLatest(scope.userId(), key, new EvaluationCutoff(cutoff, cutoff))
-                .map(context -> map(scope, cutoff, key, context))
+                .map(context -> publish(scope, cutoff, key, context))
                 .orElseGet(() -> unavailable(scope, cutoff, key));
+    }
+
+    private DecisionResource publish(
+            ShadowScope scope, Instant cutoff, MarketContextKey key, MarketContextSnapshot context) {
+        DecisionResource resource = map(scope, cutoff, key, context);
+        return payloads == null ? resource : payloads.publish(scope, type(), resource, context);
     }
 
     private static DecisionResource map(

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.predictiveedge.broker.domain.EquityMarketTick;
 import org.predictiveedge.broker.domain.Instrument;
 import org.predictiveedge.broker.domain.MarketDataStreamState;
+import org.predictiveedge.broker.domain.MarketDepthLevel;
 import org.predictiveedge.marketintelligence.application.MarketTickRejection;
 import org.predictiveedge.marketintelligence.domain.BarFinalityState;
 import org.predictiveedge.marketintelligence.domain.BarInterval;
@@ -36,6 +37,7 @@ class MicrometerMarketIntelligenceMetricsTest {
         var tick = new EquityMarketTick(instrument, "408065", new BigDecimal("100"), 1,
                 new BigDecimal("100"), 10, 100, 100, new BigDecimal("100"),
                 new BigDecimal("200"), new BigDecimal("50"), new BigDecimal("99"),
+                MarketDepthLevel.emptyBook(), MarketDepthLevel.emptyBook(),
                 START, START, START.plusMillis(125));
         var rejection = new MarketTickRejection(java.util.UUID.randomUUID(), "ZD123", tick,
                 MarketTickRejection.Reason.DUPLICATE, "already seen");

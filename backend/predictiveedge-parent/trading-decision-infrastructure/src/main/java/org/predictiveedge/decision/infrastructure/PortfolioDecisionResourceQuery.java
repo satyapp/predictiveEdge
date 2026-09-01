@@ -13,17 +13,28 @@ import org.predictiveedge.decision.domain.ShadowScope;
 
 public final class PortfolioDecisionResourceQuery implements DecisionResourceQuery {
     private final PortfolioSnapshotQueryPort snapshots;
+    private final ExactAiPayloadPublisher payloads;
 
     public PortfolioDecisionResourceQuery(PortfolioSnapshotQueryPort snapshots) {
+        this(snapshots, null);
+    }
+
+    public PortfolioDecisionResourceQuery(PortfolioSnapshotQueryPort snapshots, ExactAiPayloadPublisher payloads) {
         this.snapshots = Objects.requireNonNull(snapshots, "Portfolio snapshot query is required");
+        this.payloads = payloads;
     }
 
     @Override public DecisionResourceType type() { return DecisionResourceType.PORTFOLIO; }
 
     @Override
     public DecisionResource findLatest(ShadowScope scope, Instant cutoff) {
-        return snapshots.findLatestPortfolio(scope, cutoff).map(snapshot -> map(scope, cutoff, snapshot))
+        return snapshots.findLatestPortfolio(scope, cutoff).map(snapshot -> publish(scope, cutoff, snapshot))
                 .orElseGet(() -> unavailable(scope, cutoff));
+    }
+
+    private DecisionResource publish(ShadowScope scope, Instant cutoff, PortfolioSnapshot snapshot) {
+        DecisionResource resource = map(scope, cutoff, snapshot);
+        return payloads == null ? resource : payloads.publish(scope, type(), resource, snapshot);
     }
 
     private static DecisionResource map(ShadowScope scope, Instant cutoff, PortfolioSnapshot snapshot) {

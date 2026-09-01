@@ -15,6 +15,30 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 class JdbcAiEvidencePayloadStoreTest {
     @Test
+    void acceptsAnInsertOrAnIdenticalIdempotentConflictOnly() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+        var store = new JdbcAiEvidencePayloadStore(jdbc);
+        var bundle = OpenAiRecommendationGatewayTest.bundle(
+                org.predictiveedge.decision.domain.AssessmentReadiness.READY);
+
+        assertThat(store.append(bundle.scope(), DecisionResourceType.RISK, "risk-snapshot:risk-1",
+                "a".repeat(64), bundle.assembledAt(), "{\"risk\":true}")).isTrue();
+    }
+
+    @Test
+    void reportsAConflictingPayloadAsNotAccepted() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
+        var store = new JdbcAiEvidencePayloadStore(jdbc);
+        var bundle = OpenAiRecommendationGatewayTest.bundle(
+                org.predictiveedge.decision.domain.AssessmentReadiness.READY);
+
+        assertThat(store.append(bundle.scope(), DecisionResourceType.RISK, "risk-snapshot:risk-1",
+                "a".repeat(64), bundle.assembledAt(), "{\"risk\":false}")).isFalse();
+    }
+
+    @Test
     void resolvesEveryExactPayloadWithoutDroppingAnyResource() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.queryForList(anyString(), eq(String.class), any(Object[].class)))

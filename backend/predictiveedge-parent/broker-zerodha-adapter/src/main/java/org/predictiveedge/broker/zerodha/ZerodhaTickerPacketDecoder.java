@@ -16,6 +16,7 @@ import org.predictiveedge.broker.domain.LiveMarketDataInstrument;
 import org.predictiveedge.broker.domain.LiveMarketDataSubscription;
 import org.predictiveedge.broker.domain.MarketDataDetail;
 import org.predictiveedge.broker.domain.MarketDataInstrumentKind;
+import org.predictiveedge.broker.domain.MarketDepthLevel;
 import org.predictiveedge.broker.domain.MarketTick;
 
 /** Strict decoder for the Kite Connect v3 big-endian binary quote protocol. */
@@ -72,8 +73,14 @@ public final class ZerodhaTickerPacketDecoder {
         if (configured == null) throw malformed("Packet contains an unsubscribed instrument token");
         int expected = configured.kind() == MarketDataInstrumentKind.EQUITY ? EQUITY_FULL_BYTES : INDEX_FULL_BYTES;
         if (length != expected) throw malformed("Packet length does not match configured instrument kind and FULL mode");
-        return configured.kind() == MarketDataInstrumentKind.EQUITY
-                ? equity(packet, configured, receivedAt) : index(packet, configured, receivedAt);
+        try {
+            return configured.kind() == MarketDataInstrumentKind.EQUITY
+                    ? equity(packet, configured, receivedAt) : index(packet, configured, receivedAt);
+        } catch (BrokerFailure failure) {
+            throw failure;
+        } catch (IllegalArgumentException failure) {
+            throw malformed(failure.getMessage());
+        }
     }
 
     private static EquityMarketTick equity(ByteBuffer packet, LiveMarketDataInstrument configured, Instant receivedAt) {
@@ -83,7 +90,18 @@ public final class ZerodhaTickerPacketDecoder {
                 price(packet.getInt(4)), unsigned(packet.getInt(8)), price(packet.getInt(12)),
                 unsigned(packet.getInt(16)), unsigned(packet.getInt(20)), unsigned(packet.getInt(24)),
                 price(packet.getInt(28)), price(packet.getInt(32)), price(packet.getInt(36)), price(packet.getInt(40)),
+                depth(packet, 64), depth(packet, 124),
                 lastTradeAt, exchangeAt, receivedAt);
+    }
+
+    private static List<MarketDepthLevel> depth(ByteBuffer packet, int start) {
+        var levels = new ArrayList<MarketDepthLevel>(5);
+        for (int index = 0; index < 5; index++) {
+            int offset = start + (index * 12);
+            levels.add(new MarketDepthLevel(index + 1, price(packet.getInt(offset + 4)),
+                    unsigned(packet.getInt(offset)), Short.toUnsignedInt(packet.getShort(offset + 8))));
+        }
+        return List.copyOf(levels);
     }
 
     private static IndexMarketTick index(ByteBuffer packet, LiveMarketDataInstrument configured, Instant receivedAt) {
