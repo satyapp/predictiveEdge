@@ -88,7 +88,7 @@ public final class JdbcDecisionSafetySnapshotStore implements
                 """, snapshot.snapshotId(), snapshot.userId(), snapshot.instrument().venue(),
                 snapshot.instrument().instrumentId(), Timestamp.from(snapshot.analysisCutoff()),
                 Timestamp.from(snapshot.knowledgeCutoff()), Timestamp.from(snapshot.availableAt()),
-                Timestamp.from(snapshot.context().validUntil()), snapshot.evidenceHash(), serialize(snapshot)) == 1;
+                Timestamp.from(snapshot.validUntil()), snapshot.evidenceHash(), serialize(snapshot)) == 1;
     }
 
     @Override
@@ -98,7 +98,8 @@ public final class JdbcDecisionSafetySnapshotStore implements
 
     @Override
     public ExecutionContext findLatest(ShadowScope scope, Instant cutoff) {
-        return findLatestEvidence(scope, cutoff).map(ExecutionEvidenceSnapshot::context)
+        return findLatestEvidence(scope, cutoff).filter(snapshot -> snapshot.context() != null)
+                .map(ExecutionEvidenceSnapshot::context)
                 .orElseThrow(() -> new IllegalStateException("No causal execution context exists for shadow evidence"));
     }
 

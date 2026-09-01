@@ -96,6 +96,30 @@ predictiveedge:
     instrument-id: ${PE_SHADOW_INSTRUMENT_ID:}
     market-context-horizon: ${PE_SHADOW_MARKET_CONTEXT_HORIZON:INTRADAY}
     minimum-directional-probability: ${PE_SHADOW_MINIMUM_DIRECTIONAL_PROBABILITY:0.55}
+  safety-assessment:
+    enabled: ${PE_SAFETY_ASSESSMENT_ENABLED:false}
+    execution:
+      policy-version: ${PE_EXECUTION_POLICY_VERSION:execution-v1}
+      maximum-depth-age: ${PE_EXECUTION_MAXIMUM_DEPTH_AGE:PT3S}
+      validity: ${PE_EXECUTION_VALIDITY:PT2S}
+      maximum-spread-bps: ${PE_EXECUTION_MAXIMUM_SPREAD_BPS:}
+      maximum-slippage-bps: ${PE_EXECUTION_MAXIMUM_SLIPPAGE_BPS:}
+      fees-and-taxes-bps: ${PE_EXECUTION_FEES_AND_TAXES_BPS:}
+      decision-to-order-latency-millis: ${PE_EXECUTION_DECISION_TO_ORDER_LATENCY_MILLIS:0}
+    risk:
+      policy-version: ${PE_RISK_POLICY_VERSION:}
+      maximum-risk-per-trade: ${PE_MAXIMUM_RISK_PER_TRADE:}
+      daily-loss-limit: ${PE_DAILY_LOSS_LIMIT:}
+      maximum-open-risk: ${PE_MAXIMUM_OPEN_RISK:}
+      maximum-position-value: ${PE_MAXIMUM_POSITION_VALUE:}
+      maximum-account-age: ${PE_RISK_MAXIMUM_ACCOUNT_AGE:PT5S}
+      validity: ${PE_RISK_VALIDITY:PT2S}
+    portfolio:
+      policy-version: ${PE_PORTFOLIO_POLICY_VERSION:}
+      maximum-single-position-weight-percent: ${PE_MAXIMUM_SINGLE_POSITION_WEIGHT_PERCENT:}
+      allow-short-positions: ${PE_ALLOW_SHORT_POSITIONS:false}
+      maximum-account-age: ${PE_PORTFOLIO_MAXIMUM_ACCOUNT_AGE:PT5S}
+      validity: ${PE_PORTFOLIO_VALIDITY:PT2S}
   ai:
     provider: ${PE_AI_PROVIDER:none}
     ollama:

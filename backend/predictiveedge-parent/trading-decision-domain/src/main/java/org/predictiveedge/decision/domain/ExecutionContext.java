@@ -10,7 +10,10 @@ public record ExecutionContext(
         BigDecimal bestBid,
         BigDecimal bestAsk,
         String depthSnapshotRef,
+        RecommendationAction direction,
         int proposedQuantity,
+        long visibleEntryQuantity,
+        long visibleExitQuantity,
         BigDecimal estimatedFillPrice,
         BigDecimal spreadBps,
         BigDecimal estimatedSlippageBps,
@@ -30,7 +33,11 @@ public record ExecutionContext(
             throw new IllegalArgumentException("Depth snapshot reference is required");
         }
         depthSnapshotRef = depthSnapshotRef.trim();
+        Objects.requireNonNull(direction, "Execution direction is required");
+        if (!direction.isDirectional()) throw new IllegalArgumentException("Execution direction must be BUY or SELL");
         if (proposedQuantity <= 0) throw new IllegalArgumentException("Proposed quantity must be positive");
+        if (visibleEntryQuantity < 0 || visibleExitQuantity < 0)
+            throw new IllegalArgumentException("Visible depth quantities cannot be negative");
         positive(estimatedFillPrice, "Estimated fill price");
         nonNegative(spreadBps, "Spread bps");
         nonNegative(estimatedSlippageBps, "Estimated slippage bps");
@@ -39,6 +46,18 @@ public record ExecutionContext(
         if (decisionToOrderLatencyMillis < 0) throw new IllegalArgumentException("Latency cannot be negative");
         Objects.requireNonNull(validUntil, "Valid-until time is required");
         if (!observedAt.isBefore(validUntil)) throw new IllegalArgumentException("Execution context validity is invalid");
+    }
+
+    /** Compatibility constructor for previously stored/tested contexts; new producers use explicit fields. */
+    public ExecutionContext(Instant observedAt, BigDecimal bestBid, BigDecimal bestAsk,
+            String depthSnapshotRef, int proposedQuantity, BigDecimal estimatedFillPrice,
+            BigDecimal spreadBps, BigDecimal estimatedSlippageBps, BigDecimal estimatedFeesAndTaxes,
+            BigDecimal estimatedMarketImpactBps, long decisionToOrderLatencyMillis,
+            boolean entryFeasible, boolean exitFeasible, Instant validUntil) {
+        this(observedAt, bestBid, bestAsk, depthSnapshotRef, RecommendationAction.BUY, proposedQuantity,
+                proposedQuantity, proposedQuantity, estimatedFillPrice, spreadBps, estimatedSlippageBps,
+                estimatedFeesAndTaxes, estimatedMarketImpactBps, decisionToOrderLatencyMillis,
+                entryFeasible, exitFeasible, validUntil);
     }
 
     public boolean isUsableAt(Instant cutoff) {

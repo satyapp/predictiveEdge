@@ -39,13 +39,13 @@ public final class ExecutionDecisionResourceQuery implements DecisionResourceQue
 
     private static DecisionResource map(ShadowScope scope, Instant cutoff, ExecutionEvidenceSnapshot snapshot) {
         scope.requireMatches(snapshot.userId(), snapshot.instrument());
-        AssessmentReadiness readiness = cutoff.isBefore(snapshot.context().validUntil())
+        AssessmentReadiness readiness = cutoff.isBefore(snapshot.validUntil())
                 ? snapshot.readiness() : AssessmentReadiness.STALE;
-        GateDisposition gate = snapshot.context().entryFeasible() && snapshot.context().exitFeasible()
-                ? GateDisposition.PASS : GateDisposition.VETO;
+        GateDisposition gate = readiness == AssessmentReadiness.READY
+                ? snapshot.gateDisposition() : GateDisposition.VETO;
         return new DecisionResource("execution:" + snapshot.snapshotId(), DecisionResourceType.EXECUTION,
                 snapshot.userId(), snapshot.instrument(), readiness, gate, snapshot.analysisCutoff(),
-                snapshot.knowledgeCutoff(), snapshot.availableAt(), snapshot.context().validUntil(),
+                snapshot.knowledgeCutoff(), snapshot.availableAt(), snapshot.validUntil(),
                 "execution-snapshot:" + snapshot.snapshotId(), snapshot.evidenceHash());
     }
 

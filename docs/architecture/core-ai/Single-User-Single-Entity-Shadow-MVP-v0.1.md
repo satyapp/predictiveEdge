@@ -155,11 +155,35 @@ same user, instrument, resource type, payload reference, evidence hash and
 availability time as its `DecisionResource`. Identical publication is idempotent;
 a conflicting JSON payload for the same identity fails closed.
 
-The next bounded task is to derive Execution from depth plus an explicit trader
-direction, and to derive Risk and Portfolio from the latest broker evidence plus
-versioned personal risk/concentration policy. Missing, stale or contradictory
-facts must produce `UNAVAILABLE` and `VETO`. Scanner, Strategy, Learning, Data
-Quality, Regime/Drift, Validation and Calibration then follow the same contributor
-and exact-payload contracts. Only after a complete twelve-resource batch can be
+Execution, Risk and Portfolio producers now consume one explicit advisory
+assessment request containing trader direction, quantity and stop-loss price.
+Execution walks asks for BUY and bids for SELL, calculates visible entry/exit
+capacity, volume-weighted fill, spread, impact, slippage and configured fees.
+Risk calculates proposed stop-loss risk and daily P&L capacity from current
+broker facts. It does not infer stop risk for existing open positions: if an open
+position exists without governed stop evidence, Risk returns `UNAVAILABLE` and
+`VETO`. Portfolio calculates present exposure plus projected post-trade exposure,
+weight and short-position policy. Missing, stale or contradictory facts produce
+persisted `UNAVAILABLE`/`INVALID` snapshots and `VETO`.
+
+The producer is opt-in through `PE_SAFETY_ASSESSMENT_ENABLED=true`. Monetary and
+concentration thresholds have no defaults and must be explicitly supplied:
+
+- `PE_EXECUTION_MAXIMUM_SPREAD_BPS`, `PE_EXECUTION_MAXIMUM_SLIPPAGE_BPS`,
+  `PE_EXECUTION_FEES_AND_TAXES_BPS`;
+- `PE_RISK_POLICY_VERSION`, `PE_MAXIMUM_RISK_PER_TRADE`, `PE_DAILY_LOSS_LIMIT`,
+  `PE_MAXIMUM_OPEN_RISK`, `PE_MAXIMUM_POSITION_VALUE`; and
+- `PE_PORTFOLIO_POLICY_VERSION`, `PE_MAXIMUM_SINGLE_POSITION_WEIGHT_PERCENT`
+  and `PE_ALLOW_SHORT_POSITIONS`.
+
+After a read-only broker account capture and live FULL-depth subscription, an
+authenticated caller can append the three assessments through
+`POST /api/decision/v1/safety-assessments`. This endpoint is advisory-only and
+contains no order operation.
+
+The next bounded task is to bind this producer to the single-scope shadow intent
+lifecycle, then implement Scanner and Strategy contributors. Learning, Data
+Quality, Regime/Drift, Validation and Calibration follow the same contributor and
+exact-payload contracts. Only after a complete twelve-resource batch can be
 produced and replayed should the shadow scheduler invoke either structured AI
 provider.

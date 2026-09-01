@@ -32,6 +32,7 @@
     <module>../chart-intelligence-infrastructure</module>
     <module>../trading-decision-application</module>
     <module>../trading-decision-infrastructure</module>
+    <module>../trading-decision-api</module>
     <module>../trade-guardian-domain</module>
     <module>../trade-guardian-application</module>
     <module>../trade-guardian-infrastructure</module>

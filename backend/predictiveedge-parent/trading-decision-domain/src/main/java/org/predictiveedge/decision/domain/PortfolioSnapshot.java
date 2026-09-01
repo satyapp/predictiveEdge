@@ -16,9 +16,12 @@ public record PortfolioSnapshot(
         BigDecimal availableCash,
         BigDecimal grossExposure,
         BigDecimal netExposure,
+        BigDecimal proposedTradeValue,
+        BigDecimal projectedGrossExposure,
         BigDecimal instrumentQuantity,
         BigDecimal instrumentMarketValue,
         BigDecimal instrumentWeightPercent,
+        BigDecimal projectedInstrumentWeightPercent,
         BigDecimal largestPositionWeightPercent,
         BigDecimal maximumSinglePositionWeightPercent,
         int openPositionCount,
@@ -42,14 +45,18 @@ public record PortfolioSnapshot(
         nonNegative(availableCash, "Available cash");
         nonNegative(grossExposure, "Gross exposure");
         Objects.requireNonNull(netExposure, "Net exposure is required");
+        nonNegative(proposedTradeValue, "Proposed trade value");
+        nonNegative(projectedGrossExposure, "Projected gross exposure");
         Objects.requireNonNull(instrumentQuantity, "Instrument quantity is required");
         nonNegative(instrumentMarketValue, "Instrument market value");
         percentage(instrumentWeightPercent, "Instrument weight");
+        percentage(projectedInstrumentWeightPercent, "Projected instrument weight");
         percentage(largestPositionWeightPercent, "Largest-position weight");
         percentage(maximumSinglePositionWeightPercent, "Maximum single-position weight");
         if (openPositionCount < 0) throw new IllegalArgumentException("Open-position count cannot be negative");
         if (gateDisposition == GateDisposition.PASS
                 && (instrumentWeightPercent.compareTo(maximumSinglePositionWeightPercent) > 0
+                || projectedInstrumentWeightPercent.compareTo(maximumSinglePositionWeightPercent) > 0
                 || largestPositionWeightPercent.compareTo(maximumSinglePositionWeightPercent) > 0)) {
             throw new IllegalArgumentException("Portfolio gate cannot pass while concentration exceeds policy");
         }
@@ -57,6 +64,20 @@ public record PortfolioSnapshot(
         causalTimes(analysisCutoff, knowledgeCutoff, availableAt, validUntil);
         evidenceReferences = references(evidenceReferences);
         evidenceHash = hash(evidenceHash);
+    }
+
+    public PortfolioSnapshot(String snapshotId, UUID userId, InstrumentRef instrument,
+            AssessmentReadiness readiness, GateDisposition gateDisposition, BigDecimal availableCash,
+            BigDecimal grossExposure, BigDecimal netExposure, BigDecimal instrumentQuantity,
+            BigDecimal instrumentMarketValue, BigDecimal instrumentWeightPercent,
+            BigDecimal largestPositionWeightPercent, BigDecimal maximumSinglePositionWeightPercent,
+            int openPositionCount, String policyVersion, Instant analysisCutoff, Instant knowledgeCutoff,
+            Instant availableAt, Instant validUntil, List<String> evidenceReferences, String evidenceHash) {
+        this(snapshotId, userId, instrument, readiness, gateDisposition, availableCash, grossExposure,
+                netExposure, BigDecimal.ZERO, grossExposure, instrumentQuantity, instrumentMarketValue,
+                instrumentWeightPercent, instrumentWeightPercent, largestPositionWeightPercent,
+                maximumSinglePositionWeightPercent, openPositionCount, policyVersion, analysisCutoff,
+                knowledgeCutoff, availableAt, validUntil, evidenceReferences, evidenceHash);
     }
 
     private static void percentage(BigDecimal value, String name) {

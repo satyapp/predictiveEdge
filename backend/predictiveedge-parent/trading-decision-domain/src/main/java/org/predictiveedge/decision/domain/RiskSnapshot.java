@@ -15,8 +15,12 @@ public record RiskSnapshot(
         GateDisposition gateDisposition,
         BigDecimal availableCapital,
         BigDecimal maximumRiskPerTrade,
+        BigDecimal proposedTradeRisk,
+        BigDecimal currentDailyPnl,
         BigDecimal remainingDailyLossBudget,
         BigDecimal currentOpenRisk,
+        boolean openRiskComplete,
+        int unassessedOpenPositionCount,
         BigDecimal maximumOpenRisk,
         BigDecimal maximumPositionValue,
         boolean tradingAllowed,
@@ -39,21 +43,40 @@ public record RiskSnapshot(
         }
         nonNegative(availableCapital, "Available capital");
         positive(maximumRiskPerTrade, "Maximum risk per trade");
+        nonNegative(proposedTradeRisk, "Proposed trade risk");
+        Objects.requireNonNull(currentDailyPnl, "Current daily P&L is required");
         nonNegative(remainingDailyLossBudget, "Remaining daily loss budget");
         nonNegative(currentOpenRisk, "Current open risk");
+        if (unassessedOpenPositionCount < 0)
+            throw new IllegalArgumentException("Unassessed open-position count cannot be negative");
+        if (openRiskComplete != (unassessedOpenPositionCount == 0))
+            throw new IllegalArgumentException("Open-risk completeness must match unassessed positions");
         positive(maximumOpenRisk, "Maximum open risk");
         positive(maximumPositionValue, "Maximum position value");
         if (tradingAllowed != (gateDisposition == GateDisposition.PASS)) {
             throw new IllegalArgumentException("Risk gate must match trading-allowed status");
         }
         if (tradingAllowed && (availableCapital.signum() == 0 || remainingDailyLossBudget.signum() == 0
-                || currentOpenRisk.compareTo(maximumOpenRisk) >= 0)) {
+                || !openRiskComplete || currentOpenRisk.compareTo(maximumOpenRisk) >= 0
+                || proposedTradeRisk.compareTo(maximumRiskPerTrade) > 0)) {
             throw new IllegalArgumentException("Risk gate cannot pass without remaining capital and risk capacity");
         }
         policyVersion = required(policyVersion, "Risk policy version");
         causalTimes(analysisCutoff, knowledgeCutoff, availableAt, validUntil);
         evidenceReferences = references(evidenceReferences);
         evidenceHash = hash(evidenceHash);
+    }
+
+    public RiskSnapshot(String snapshotId, UUID userId, InstrumentRef instrument,
+            AssessmentReadiness readiness, GateDisposition gateDisposition, BigDecimal availableCapital,
+            BigDecimal maximumRiskPerTrade, BigDecimal remainingDailyLossBudget, BigDecimal currentOpenRisk,
+            BigDecimal maximumOpenRisk, BigDecimal maximumPositionValue, boolean tradingAllowed,
+            String policyVersion, Instant analysisCutoff, Instant knowledgeCutoff, Instant availableAt,
+            Instant validUntil, List<String> evidenceReferences, String evidenceHash) {
+        this(snapshotId, userId, instrument, readiness, gateDisposition, availableCapital,
+                maximumRiskPerTrade, BigDecimal.ZERO, BigDecimal.ZERO, remainingDailyLossBudget,
+                currentOpenRisk, true, 0, maximumOpenRisk, maximumPositionValue, tradingAllowed, policyVersion,
+                analysisCutoff, knowledgeCutoff, availableAt, validUntil, evidenceReferences, evidenceHash);
     }
 
     private static void positive(BigDecimal value, String name) {

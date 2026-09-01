@@ -1,5 +1,6 @@
 package org.predictiveedge.decision.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
@@ -56,6 +57,16 @@ class DecisionSafetySnapshotsTest {
                 AssessmentReadiness.READY, context, NOW.minusSeconds(3), NOW.minusSeconds(2),
                 NOW.minusSeconds(1), List.of("depth:1"), HASH)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("causal times");
+    }
+
+    @Test
+    void unavailableExecutionCanVetoWithoutInventingAQuote() {
+        var snapshot = new ExecutionEvidenceSnapshot("execution-unavailable", USER, EQUITY,
+                AssessmentReadiness.UNAVAILABLE, GateDisposition.VETO, null, NOW.minusSeconds(2),
+                NOW.minusSeconds(1), NOW, NOW.plusNanos(1), List.of("unavailable:depth"), HASH);
+
+        assertThat(snapshot.context()).isNull();
+        assertThat(snapshot.gateDisposition()).isEqualTo(GateDisposition.VETO);
     }
 
     private static RiskSnapshot risk(GateDisposition gate, boolean allowed) {

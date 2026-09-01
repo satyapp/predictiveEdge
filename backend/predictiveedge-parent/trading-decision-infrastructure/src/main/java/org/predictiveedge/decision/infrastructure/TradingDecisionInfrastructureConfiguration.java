@@ -5,6 +5,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
+import java.math.BigDecimal;
+import org.predictiveedge.broker.connection.BrokerAccountEvidencePort;
+import org.predictiveedge.decision.application.ExecutionAssessmentPolicy;
+import org.predictiveedge.decision.application.PersonalPortfolioPolicy;
+import org.predictiveedge.decision.application.PersonalRiskPolicy;
+import org.predictiveedge.decision.application.SafetySnapshotProducer;
+import org.predictiveedge.marketintelligence.application.MarketDepthQueryPort;
 import org.predictiveedge.chart.application.ChartSnapshotQueryPort;
 import org.predictiveedge.decision.application.AiEvidencePayloadQuery;
 import org.predictiveedge.decision.application.AiRecommendationGateway;
@@ -31,6 +38,41 @@ public class TradingDecisionInfrastructureConfiguration {
     @Bean
     JdbcDecisionSafetySnapshotStore jdbcDecisionSafetySnapshotStore(JdbcTemplate jdbc, ObjectMapper json) {
         return new JdbcDecisionSafetySnapshotStore(jdbc, json);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "predictiveedge.safety-assessment", name = "enabled", havingValue = "true")
+    SafetySnapshotProducer safetySnapshotProducer(
+            MarketDepthQueryPort depths,
+            BrokerAccountEvidencePort accounts,
+            JdbcDecisionSafetySnapshotStore snapshots,
+            @Value("${predictiveedge.safety-assessment.execution.policy-version:execution-v1}") String executionVersion,
+            @Value("${predictiveedge.safety-assessment.execution.maximum-depth-age:PT3S}") Duration maximumDepthAge,
+            @Value("${predictiveedge.safety-assessment.execution.validity:PT2S}") Duration executionValidity,
+            @Value("${predictiveedge.safety-assessment.execution.maximum-spread-bps}") BigDecimal maximumSpreadBps,
+            @Value("${predictiveedge.safety-assessment.execution.maximum-slippage-bps}") BigDecimal maximumSlippageBps,
+            @Value("${predictiveedge.safety-assessment.execution.fees-and-taxes-bps}") BigDecimal feesAndTaxesBps,
+            @Value("${predictiveedge.safety-assessment.execution.decision-to-order-latency-millis:0}") long latencyMillis,
+            @Value("${predictiveedge.safety-assessment.risk.policy-version}") String riskVersion,
+            @Value("${predictiveedge.safety-assessment.risk.maximum-risk-per-trade}") BigDecimal maximumRiskPerTrade,
+            @Value("${predictiveedge.safety-assessment.risk.daily-loss-limit}") BigDecimal dailyLossLimit,
+            @Value("${predictiveedge.safety-assessment.risk.maximum-open-risk}") BigDecimal maximumOpenRisk,
+            @Value("${predictiveedge.safety-assessment.risk.maximum-position-value}") BigDecimal maximumPositionValue,
+            @Value("${predictiveedge.safety-assessment.risk.maximum-account-age:PT5S}") Duration riskAccountAge,
+            @Value("${predictiveedge.safety-assessment.risk.validity:PT2S}") Duration riskValidity,
+            @Value("${predictiveedge.safety-assessment.portfolio.policy-version}") String portfolioVersion,
+            @Value("${predictiveedge.safety-assessment.portfolio.maximum-single-position-weight-percent}") BigDecimal maximumPositionWeight,
+            @Value("${predictiveedge.safety-assessment.portfolio.allow-short-positions:false}") boolean allowShortPositions,
+            @Value("${predictiveedge.safety-assessment.portfolio.maximum-account-age:PT5S}") Duration portfolioAccountAge,
+            @Value("${predictiveedge.safety-assessment.portfolio.validity:PT2S}") Duration portfolioValidity) {
+        var execution = new ExecutionAssessmentPolicy(executionVersion, maximumDepthAge, executionValidity,
+                maximumSpreadBps, maximumSlippageBps, feesAndTaxesBps, latencyMillis);
+        var risk = new PersonalRiskPolicy(riskVersion, maximumRiskPerTrade, dailyLossLimit,
+                maximumOpenRisk, maximumPositionValue, riskAccountAge, riskValidity);
+        var portfolio = new PersonalPortfolioPolicy(portfolioVersion, maximumPositionWeight,
+                allowShortPositions, portfolioAccountAge, portfolioValidity);
+        return new SafetySnapshotProducer(depths, accounts, snapshots, snapshots, snapshots,
+                execution, risk, portfolio, Clock.systemUTC(), () -> UUID.randomUUID().toString());
     }
 
     @Bean

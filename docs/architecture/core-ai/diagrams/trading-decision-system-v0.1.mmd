@@ -44,6 +44,12 @@ flowchart LR
     LIVE --> MI
     AE --> PI
     AE --> RI
+    D --> EXI["Execution Intelligence\ndirection-aware 5x5 fill + feasibility"]
+    TI --> EXI
+    EXI --> RI
+    EXI --> PI
+    RP["Versioned personal risk policy"] --> RI
+    PP["Versioned concentration policy"] --> PI
 
     subgraph CONTRACT["Immutable IntelligenceFeedback contract"]
         FB["action + confidence + readiness\ngate + causal cutoffs + evidence hash"]
@@ -55,6 +61,7 @@ flowchart LR
     DI --> FB
     RI --> FB
     PI --> FB
+    EXI --> FB
 
     TI["Active Trader Intent\npermitted instrument, direction, strategy, validity"]
 
