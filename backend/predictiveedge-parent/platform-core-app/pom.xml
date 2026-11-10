@@ -14,6 +14,7 @@
     <dependency><groupId>org.predictiveedge</groupId><artifactId>market-intelligence-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>market-intelligence-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-infrastructure</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>trading-decision-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>trading-decision-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>

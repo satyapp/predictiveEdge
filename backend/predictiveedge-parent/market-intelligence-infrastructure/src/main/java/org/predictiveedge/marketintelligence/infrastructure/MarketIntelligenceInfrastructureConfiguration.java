@@ -45,6 +45,11 @@ public class MarketIntelligenceInfrastructureConfiguration {
     }
 
     @Bean
+    JdbcPreOpenAuctionStore preOpenAuctionStore(JdbcTemplate jdbc) {
+        return new JdbcPreOpenAuctionStore(jdbc);
+    }
+
+    @Bean
     MarketSessionPort marketSessionPort(JdbcTemplate jdbc) {
         return new JdbcMarketSessionAdapter(jdbc);
     }

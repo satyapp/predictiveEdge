@@ -17,6 +17,7 @@ import org.predictiveedge.broker.connection.UserMarketDataSubscriptionService;
 import org.predictiveedge.broker.zerodha.JdkZerodhaTransport;
 import org.predictiveedge.broker.zerodha.JdkZerodhaWebSocketConnector;
 import org.predictiveedge.broker.zerodha.ZerodhaInstrumentResolver;
+import org.predictiveedge.broker.zerodha.ZerodhaHistoricalDataProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaLiveMarketDataProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaLoginClient;
 import org.predictiveedge.broker.zerodha.ZerodhaReconnectPolicy;
@@ -24,6 +25,7 @@ import org.predictiveedge.broker.zerodha.ZerodhaAccountSnapshotProvider;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionClient;
 import org.predictiveedge.broker.zerodha.ZerodhaSessionProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataProvider;
+import org.predictiveedge.broker.spi.HistoricalMarketDataProvider;
 import org.predictiveedge.broker.spi.BrokerAccountSnapshotProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataInstrumentResolver;
 import org.springframework.beans.factory.annotation.Value;
@@ -81,6 +83,12 @@ public class BrokerConnectionInfrastructureConfiguration {
     LiveMarketDataInstrumentResolver zerodhaInstrumentResolver(
             ZerodhaSessionProvider sessions, JdkZerodhaTransport transport) {
         return new ZerodhaInstrumentResolver(sessions, transport, Clock.systemUTC());
+    }
+
+    @Bean
+    HistoricalMarketDataProvider zerodhaHistoricalDataProvider(
+            ZerodhaSessionProvider sessions, JdkZerodhaTransport transport, ObjectMapper json) {
+        return new ZerodhaHistoricalDataProvider(sessions, transport, json);
     }
 
     @Bean(destroyMethod = "shutdown")
