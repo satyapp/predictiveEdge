@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Complete immutable input passed to the sole AI recommendation authority. */
+/** Complete immutable input passed to first-level AI and mandatory final Decision Intelligence. */
 public record AITradingDecisionInputBundle(
         String bundleId,
         ShadowScope scope,

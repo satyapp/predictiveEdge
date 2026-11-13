@@ -24,6 +24,7 @@ import org.predictiveedge.broker.spi.LiveMarketDataInstrumentResolver;
 import org.predictiveedge.chart.domain.IntradayHistoricalBar;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
 import org.predictiveedge.chart.domain.IntradaySetupAssessment;
+import org.predictiveedge.chart.domain.PreOpenCandidateRanker;
 import org.predictiveedge.chart.domain.PreOpenIntradayAnalyzer;
 import org.predictiveedge.chart.domain.PreOpenSnapshot;
 import org.predictiveedge.marketintelligence.application.PreOpenAuctionObservation;
@@ -44,6 +45,7 @@ public final class PreOpenCsvAnalysisService {
     private final HistoricalMarketDataProvider history;
     private final PreOpenAuctionPublicationPort publications;
     private final PreOpenIntradayAnalyzer analyzer;
+    private final PreOpenCandidateRanker ranker;
     private final Clock clock;
 
     public PreOpenCsvAnalysisService(
@@ -52,12 +54,14 @@ public final class PreOpenCsvAnalysisService {
             HistoricalMarketDataProvider history,
             PreOpenAuctionPublicationPort publications,
             PreOpenIntradayAnalyzer analyzer,
+            PreOpenCandidateRanker ranker,
             Clock clock) {
         this.parser = Objects.requireNonNull(parser, "CSV parser is required");
         this.instruments = Objects.requireNonNull(instruments, "Instrument resolver is required");
         this.history = Objects.requireNonNull(history, "Historical-data provider is required");
         this.publications = Objects.requireNonNull(publications, "Snapshot publication port is required");
         this.analyzer = Objects.requireNonNull(analyzer, "Pre-open analyzer is required");
+        this.ranker = Objects.requireNonNull(ranker, "Pre-open candidate ranker is required");
         this.clock = Objects.requireNonNull(clock, "Clock is required");
     }
 
@@ -105,8 +109,10 @@ public final class PreOpenCsvAnalysisService {
                 .filter(value -> value.assessment().action() == IntradaySetupAction.BUY_CANDIDATE
                         || value.assessment().action() == IntradaySetupAction.SELL_CANDIDATE)
                 .toList();
+        var ranking = ranker.rank(candidates.stream().map(InstrumentAnalysis::assessment).toList(),
+                command.maximumCandidates());
         return new Result("CANDIDATE_ONLY", startedAt, clock.instant(), parsed.snapshots().size(),
-                parsed.rejectedRows(), shortlisted.size(), List.copyOf(analyses), candidates,
+                parsed.rejectedRows(), shortlisted.size(), List.copyOf(analyses), candidates, ranking,
                 List.copyOf(failures));
     }
 
@@ -181,6 +187,7 @@ public final class PreOpenCsvAnalysisService {
             int shortlistedForHistory,
             List<InstrumentAnalysis> analyses,
             List<InstrumentAnalysis> candidates,
+            PreOpenCandidateRanker.RankedUniverse ranking,
             List<InstrumentFailure> failures) { }
 
     public record InstrumentAnalysis(

@@ -21,7 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Append-only persistence and causal reads for final exchange pre-open auction snapshots. */
-public final class JdbcPreOpenAuctionStore implements PreOpenAuctionPublicationPort, PreOpenAuctionQueryPort {
+public class JdbcPreOpenAuctionStore implements PreOpenAuctionPublicationPort, PreOpenAuctionQueryPort {
     private final JdbcTemplate jdbc;
 
     public JdbcPreOpenAuctionStore(JdbcTemplate jdbc) {

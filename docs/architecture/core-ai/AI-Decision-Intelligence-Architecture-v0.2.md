@@ -4,21 +4,27 @@
 |---|---|
 | Status | Founder-confirmed target architecture |
 | Date | 2026-08-10 |
-| Recommendation authority | AI Decision Intelligence only |
+| First-level analysis | Local Ollama structured proposal |
+| Recommendation authority | Governed final Decision Intelligence only |
 | Application authority | Point-in-time data, deterministic resources, validation, persistence and audit |
-| Human boundary | AI recommends; the trader decides and executes manually |
+| Human boundary | Decision Intelligence advises; the trader decides and executes manually |
 
 ## 1. Authority boundary
 
 The application supplies governed facts, deterministic features, validated model
 evidence, user constraints and immutable audit records. It does not originate a
-trade recommendation. **AI Decision Intelligence is the sole component allowed
-to produce `BUY`, `SELL`, `WAIT`, `NO_TRADE`, `INSUFFICIENT_EVIDENCE` or a linked
-trade-management recommendation.**
+trade recommendation. Ollama may produce a structured first-level proposal, but
+that proposal is never a final call. **Governed final Decision Intelligence is
+the sole component allowed to approve a `BUY` or `SELL` call for trader review.**
+It requires the complete twelve-resource bundle and fails closed to rejection,
+`WAIT`, `NO_TRADE`, or `INSUFFICIENT_EVIDENCE` when evidence or a hard gate is
+not ready.
 
-Post-AI gates may reject an incomplete, unsafe, unvalidated or negative-edge
-response. They may not create or substitute another recommendation. Every
-recommendation remains advisory and requires trader review and manual execution.
+The Ollama proposal cannot bypass or substitute the final intelligence gate.
+The gate validates causality, resource readiness, Risk, Portfolio, Execution and
+Validation passes, positive expected value, confidence, entry validity, scope,
+and Ollama model provenance. Every approved recommendation remains advisory and
+requires trader review and manual execution.
 
 ## 2. Authoritative intelligence list
 
@@ -137,20 +143,17 @@ flowchart TB
     PHASE --> B
     B --> READY{"All mandatory resources current,\ncausal, validated and same user?"}
     READY -->|"No"| IE["INSUFFICIENT_EVIDENCE / DATA_STALE"]
-    READY -->|"Yes"| AI["AI Decision Intelligence\nsole recommendation authority"]
-    AI --> REC["Structured AI recommendation\nentry window + horizon + stop + targets\nprobability + uncertainty + failure clarification"]
-    REC --> EV{"Positive expected value after costs\nand confidence above policy threshold?"}
-    CAL --> EV
-    EI --> EV
-    EV -->|"No"| ABSTAIN["NO_TRADE / WAIT"]
-    EV -->|"Yes"| VAL["Deterministic policy validator\nchecks; never invents a recommendation"]
-    RI --> VAL
-    PI --> VAL
-    EI --> VAL
-    VI --> VAL
-    TI --> VAL
-    VAL -->|"Valid"| REVIEW["Trader review"]
-    VAL -->|"Violation"| REJECT["AI recommendation rejected"]
+    READY -->|"Yes"| OLLAMA["Ollama first-level analysis\nstructured proposal only"]
+    OLLAMA --> FINAL{"Governed final Decision Intelligence\nall resources + hard gates + provenance\npositive edge + confidence + execution validity"}
+    RI --> FINAL
+    PI --> FINAL
+    EI --> FINAL
+    VI --> FINAL
+    CAL --> FINAL
+    TI --> FINAL
+    FINAL -->|"Approve"| REC["Approved advisory recommendation\nentry window + horizon + stop + targets\nprobability + uncertainty + failure clarification"]
+    FINAL -->|"Reject / abstain"| REJECT["Proposal rejected / WAIT / NO_TRADE"]
+    REC --> REVIEW["Trader review"]
     REVIEW -->|"Accept"| BROKER["Manual execution at broker"]
     REVIEW -->|"Reject / watch"| CASE["Immutable learning case"]
     BROKER --> TRADE["Actual fills + costs + registered trade state"]
@@ -161,12 +164,11 @@ flowchart TB
     RI --> TG
     PI --> TG
     TG --> REASSESS["Fresh reassessment bundle\ncurrent trade + original chain + new cutoffs"]
-    REASSESS --> AI
+    REASSESS --> OLLAMA
     TG --> REVIEW
     TG --> CASE
     REC --> CASE
     REJECT --> CASE
-    ABSTAIN --> CASE
     CASE --> LI
     TRADE --> SCORE["Strict model outcome\nevery BUY/SELL => WIN or LOSS after costs"]
     SCORE --> CASE

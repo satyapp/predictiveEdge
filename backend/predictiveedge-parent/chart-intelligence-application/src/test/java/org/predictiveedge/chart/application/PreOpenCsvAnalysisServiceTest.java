@@ -16,6 +16,7 @@ import org.predictiveedge.broker.domain.Candle;
 import org.predictiveedge.broker.domain.LiveMarketDataInstrument;
 import org.predictiveedge.broker.domain.MarketDataInstrumentKind;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
+import org.predictiveedge.chart.domain.PreOpenCandidateRanker;
 import org.predictiveedge.chart.domain.PreOpenIntradayAnalyzer;
 import org.predictiveedge.marketintelligence.application.PreOpenAuctionSnapshot;
 
@@ -46,6 +47,7 @@ class PreOpenCsvAnalysisServiceTest {
         Instant observedAt = Instant.parse("2026-11-09T03:39:30Z");
         var service = new PreOpenCsvAnalysisService(new NsePreOpenCsvParser(), resolver, history, publication,
                 new PreOpenIntradayAnalyzer(PreOpenIntradayAnalyzer.Policy.conservativeDefaults()),
+                new PreOpenCandidateRanker(),
                 Clock.fixed(observedAt.plusSeconds(60), ZoneOffset.UTC));
 
         var result = service.analyze(new PreOpenCsvAnalysisService.Command(UUID.randomUUID(), "ZD123", CSV,
@@ -55,6 +57,9 @@ class PreOpenCsvAnalysisServiceTest {
         assertThat(historyCalls).hasValue(5);
         assertThat(result.parsedSnapshots()).isEqualTo(2);
         assertThat(result.shortlistedForHistory()).isEqualTo(1);
+        assertThat(result.ranking().calibratedProbability()).isFalse();
+        assertThat(result.ranking().probableGainers()).isEmpty();
+        assertThat(result.ranking().probableLosers()).isEmpty();
         assertThat(result.analyses()).singleElement().satisfies(value -> {
             assertThat(value.assessment().symbol()).isEqualTo("SBIN");
             assertThat(value.assessment().action()).isEqualTo(IntradaySetupAction.INSUFFICIENT_EVIDENCE);

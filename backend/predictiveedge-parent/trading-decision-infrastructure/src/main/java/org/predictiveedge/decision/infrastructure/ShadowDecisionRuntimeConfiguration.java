@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
 import org.predictiveedge.decision.application.AiRecommendationGateway;
+import org.predictiveedge.decision.application.FinalDecisionIntelligence;
+import org.predictiveedge.decision.application.GovernedFinalDecisionIntelligence;
 import org.predictiveedge.decision.application.ShadowDecisionCaseStore;
 import org.predictiveedge.decision.application.ShadowDecisionInputQuery;
 import org.predictiveedge.decision.application.ShadowDecisionService;
@@ -39,10 +41,18 @@ public class ShadowDecisionRuntimeConfiguration {
     }
 
     @Bean
+    FinalDecisionIntelligence finalDecisionIntelligence(
+            ShadowRecommendationValidator validator,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${predictiveedge.shadow-decision.first-level-provider:ollama}") String provider) {
+        return new GovernedFinalDecisionIntelligence(validator, provider);
+    }
+
+    @Bean
     ShadowDecisionService shadowDecisionService(ShadowScope scope, ShadowDecisionInputQuery inputQuery,
-            AiRecommendationGateway aiGateway, ShadowRecommendationValidator validator,
+            AiRecommendationGateway aiGateway, FinalDecisionIntelligence finalIntelligence,
             ShadowDecisionCaseStore caseStore) {
-        return new ShadowDecisionService(scope, inputQuery, aiGateway, validator, caseStore,
+        return new ShadowDecisionService(scope, inputQuery, aiGateway, finalIntelligence, caseStore,
                 Clock.systemUTC(), () -> UUID.randomUUID().toString());
     }
 

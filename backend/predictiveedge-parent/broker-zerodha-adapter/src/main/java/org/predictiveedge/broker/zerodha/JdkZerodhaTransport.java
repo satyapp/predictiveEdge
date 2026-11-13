@@ -31,8 +31,13 @@ public final class JdkZerodhaTransport implements ZerodhaTransport, ZerodhaToken
         try {
             var response = client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
-                        "Zerodha request failed with HTTP " + response.statusCode());
+                String body;
+                try {
+                    body = decode(response.body(), response.headers().firstValue("Content-Encoding").orElse(""));
+                } catch (IOException undecodable) {
+                    body = "";
+                }
+                throw new ZerodhaHttpFailure(response.statusCode(), body);
             }
             return decode(response.body(), response.headers().firstValue("Content-Encoding").orElse(""));
         } catch (IOException failure) {

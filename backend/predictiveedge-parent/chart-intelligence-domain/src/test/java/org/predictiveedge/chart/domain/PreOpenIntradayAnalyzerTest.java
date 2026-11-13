@@ -23,7 +23,7 @@ class PreOpenIntradayAnalyzerTest {
 
         assertThat(result.action()).isEqualTo(IntradaySetupAction.BUY_CANDIDATE);
         assertThat(result.setupType()).isEqualTo(IntradaySetupType.GAP_CONTINUATION);
-        assertThat(result.confirmationRule()).contains("15_MINUTE_HIGH").contains("VWAP");
+        assertThat(result.confirmationRule()).contains("5_MINUTE_HIGH").contains("VWAP");
         assertThat(result.ema20()).isGreaterThan(result.ema50());
         assertThat(result.indicativeStop()).isLessThan(result.referenceEntry());
         assertThat(result.indicativeTargetTwo()).isGreaterThan(result.indicativeTargetOne());
@@ -38,7 +38,7 @@ class PreOpenIntradayAnalyzerTest {
 
         assertThat(result.action()).isEqualTo(IntradaySetupAction.SELL_CANDIDATE);
         assertThat(result.setupType()).isEqualTo(IntradaySetupType.GAP_CONTINUATION);
-        assertThat(result.confirmationRule()).contains("15_MINUTE_LOW").contains("VWAP");
+        assertThat(result.confirmationRule()).contains("5_MINUTE_LOW").contains("VWAP");
         assertThat(result.ema20()).isLessThan(result.ema50());
         assertThat(result.indicativeStop()).isGreaterThan(result.referenceEntry());
     }

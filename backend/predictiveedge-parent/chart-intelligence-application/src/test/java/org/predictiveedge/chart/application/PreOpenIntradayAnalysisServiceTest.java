@@ -45,7 +45,7 @@ class PreOpenIntradayAnalysisServiceTest {
         assertThat(port.criteria.timeframe()).isEqualTo(BarTimeframe.FIVE_MINUTES);
         assertThat(port.criteria.fromInclusive()).isEqualTo(analysisCutoff.minus(Duration.ofDays(90)));
         assertThat(port.criteria.cutoff()).isEqualTo(new EvaluationCutoff(analysisCutoff, knowledgeCutoff));
-        assertThat(port.maximumResults).isEqualTo(15_000);
+        assertThat(port.maximumResults).isEqualTo(30_000);
     }
 
     @Test

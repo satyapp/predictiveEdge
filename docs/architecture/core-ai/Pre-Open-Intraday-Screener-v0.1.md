@@ -7,11 +7,15 @@
 | Ingestion endpoint | `POST /api/market-intelligence/v1/pre-open-snapshots` |
 | Analysis endpoint | `POST /api/chart-intelligence/v1/pre-open-analyses/stored` |
 | CSV workflow endpoint | `POST /api/chart-intelligence/v1/pre-open-csv-analyses` |
+| Opening confirmation endpoint | `POST /api/chart-intelligence/v1/pre-open-confirmations` |
 | Historical source | Tenant-owned finalized five-minute Market Intelligence bars |
 
 ## Purpose
 
-The screener combines final exchange pre-open auction facts with causally available OHLCV history. It returns `BUY_CANDIDATE`, `SELL_CANDIDATE`, `WAIT`, `NO_TRADE`, or `INSUFFICIENT_EVIDENCE` for each instrument. A directional candidate still requires the documented first-fifteen-minute and session-VWAP confirmation. AI Decision Intelligence remains the sole authority for a final `BUY` or `SELL` recommendation.
+End-to-end target process:
+[`Pre-Open-Market-Screen-Recommendation-Flow-v0.1.md`](./Pre-Open-Market-Screen-Recommendation-Flow-v0.1.md).
+
+The screener combines final exchange pre-open auction facts with causally available OHLCV history. It returns `BUY_CANDIDATE`, `SELL_CANDIDATE`, `WAIT`, `NO_TRADE`, or `INSUFFICIENT_EVIDENCE` for each instrument. A directional candidate still requires the documented first-finalized-five-minute and session-VWAP confirmation. AI Decision Intelligence remains the sole authority for a final `BUY` or `SELL` recommendation.
 
 ## Initial policy
 
@@ -23,6 +27,11 @@ The screener combines final exchange pre-open auction facts with causally availa
 - Calculate EMA20, EMA50, RSI14, ATR14, and auction volume relative to the median of the latest fifty finalized bars.
 - Emit a gap-continuation candidate only when the auction direction, EMA structure, last close, and RSI range align.
 - Emit a failed-gap-reversal candidate when the auction gap conflicts with the established trend.
+- Rank confirmation-gated candidates separately as probable gainers and probable losers using the versioned
+  `PREOPEN_HEURISTIC_V1` cross-sectional score. The 0-100 score combines auction gap (25%), turnover (15%),
+  relative auction participation (15%), spread quality (10%), setup/direction alignment (15%), EMA separation
+  measured in ATR units (10%), and RSI momentum quality (10%). It is a relative research score, not a calibrated
+  probability.
 - Return ATR-based indicative stop and 1R/2R targets. These levels are not executable until the confirmation rule completes.
 
 ## Causal behavior
@@ -99,10 +108,42 @@ maximumCandidates=10
 file=@MW-Pre-Open-Market-ALL-09-Nov-2026.csv
 ```
 
-The response includes parse rejections, per-symbol Zerodha failures, the number of historical bars obtained, complete assessments, and a candidate-only subset. Historical retrieval is read-only; this workflow cannot place an order or create the final BUY/SELL recommendation.
+The response includes parse rejections, per-symbol Zerodha failures, the number of historical bars obtained,
+complete assessments, a candidate-only subset, and separate `probableGainers` and `probableLosers` leaderboards.
+Historical retrieval is read-only; this workflow cannot place an order or create the final BUY/SELL recommendation.
+
+## Ranking calibration contract
+
+`PREOPEN_HEURISTIC_V1` must remain explicitly uncalibrated until replay data covers at least 60 trading sessions.
+Calibration labels must be fixed before training, for example each security's return from previous close at 09:20,
+10:00 and close, plus whether it finished in the universe's top or bottom five. Training and evaluation must use
+walk-forward date splits so no future session influences an earlier score. Minimum evaluation outputs are
+precision-at-1, hit-rate-at-5, Spearman rank correlation, direction accuracy after the mandatory five-minute/VWAP
+gate, and simulated net return after spread and slippage. Only a separately versioned calibrated model may expose
+a probability field; the heuristic score must never be renamed or interpreted as one.
+
+Candidate promotion uses a mandatory two-stage decision path. Ollama performs
+the first-level structured analysis over the complete immutable evidence bundle.
+Governed final Decision Intelligence must then execute and approve the proposal
+after all twelve intelligence resources and hard gates pass. An Ollama response
+on its own is never exposed as the final BUY/SELL call.
+
+## Opening confirmation and Chart publication
+
+After the first finalized five-minute bar is available, the confirmation
+endpoint replays the stored pre-open snapshot and causal Market Intelligence
+bars. It calculates the first-five-minute high/low and session VWAP, applies
+the setup-specific trigger, and appends an immutable `ChartSnapshot` containing
+the source snapshot hash and bar-manifest evidence. Calls before 09:20 IST return
+`WAITING_FOR_FINAL_5_MINUTE_BAR`; missing or non-final bars fail closed.
+
+The published Chart resource is factual decision input, not a BUY/SELL call.
+Ollama is invoked only after the complete twelve-resource bundle is ready, and
+the governed final Decision Intelligence gate must approve its proposal.
 
 ## Next increments
 
-1. Re-evaluate candidates after the first finalized fifteen-minute bar and calculate the actual session VWAP trigger.
-2. Publish the resulting immutable Chart resource into the AI Decision Intelligence input bundle.
-3. Add benchmark and sector synchronization, ranking, risk review, and replay-based calibration.
+1. Complete the remaining Scanner, Strategy, Learning, Data Quality, Regime/Drift,
+   Validation and Calibration resource producers for the pre-open profile.
+2. Add an authenticated evaluation API for Trader Intent and final advisory calls.
+3. Add benchmark and sector synchronization, risk review, and replay-based calibration.

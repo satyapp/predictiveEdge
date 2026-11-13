@@ -68,7 +68,7 @@ public final class PreOpenIntradayAnalyzer {
                 .map(IntradayHistoricalBar::evidenceReference).distinct().toList();
         IntradaySetupAction action = IntradaySetupAction.WAIT;
         IntradaySetupType type = IntradaySetupType.NONE;
-        String confirmation = "WAIT_FOR_FIRST_FINAL_15_MINUTE_BAR";
+        String confirmation = "WAIT_FOR_FIRST_FINAL_5_MINUTE_BAR";
         BigDecimal entry = null;
         var reasons = new ArrayList<String>();
 
@@ -79,27 +79,27 @@ public final class PreOpenIntradayAnalyzer {
         } else if (gap.signum() > 0 && trend == Trend.BULLISH && between(rsi14, policy.longMinimumRsi(), policy.longMaximumRsi())) {
             action = IntradaySetupAction.BUY_CANDIDATE;
             type = IntradaySetupType.GAP_CONTINUATION;
-            confirmation = "BUY_ONLY_ABOVE_FIRST_15_MINUTE_HIGH_AND_SESSION_VWAP";
+            confirmation = "BUY_ONLY_ABOVE_FIRST_5_MINUTE_HIGH_AND_SESSION_VWAP";
             entry = snapshot.auctionPrice();
             reasons.add("Positive auction gap aligns with bullish EMA20/EMA50 structure");
             reasons.add("RSI14 is inside the governed long-momentum range");
         } else if (gap.signum() < 0 && trend == Trend.BEARISH && between(rsi14, policy.shortMinimumRsi(), policy.shortMaximumRsi())) {
             action = IntradaySetupAction.SELL_CANDIDATE;
             type = IntradaySetupType.GAP_CONTINUATION;
-            confirmation = "SELL_ONLY_BELOW_FIRST_15_MINUTE_LOW_AND_SESSION_VWAP";
+            confirmation = "SELL_ONLY_BELOW_FIRST_5_MINUTE_LOW_AND_SESSION_VWAP";
             entry = snapshot.auctionPrice();
             reasons.add("Negative auction gap aligns with bearish EMA20/EMA50 structure");
             reasons.add("RSI14 is inside the governed short-momentum range");
         } else if (gap.signum() > 0 && trend != Trend.BULLISH) {
             action = IntradaySetupAction.SELL_CANDIDATE;
             type = IntradaySetupType.FAILED_GAP_REVERSAL;
-            confirmation = "SELL_ONLY_AFTER_FIRST_15_MINUTE_CLOSE_BELOW_PREVIOUS_CLOSE_AND_SESSION_VWAP";
+            confirmation = "SELL_ONLY_AFTER_FIRST_5_MINUTE_CLOSE_BELOW_PREVIOUS_CLOSE_AND_SESSION_VWAP";
             entry = snapshot.previousClose();
             reasons.add("Positive auction gap conflicts with the established trend");
         } else if (gap.signum() < 0 && trend != Trend.BEARISH) {
             action = IntradaySetupAction.BUY_CANDIDATE;
             type = IntradaySetupType.FAILED_GAP_REVERSAL;
-            confirmation = "BUY_ONLY_AFTER_FIRST_15_MINUTE_CLOSE_ABOVE_PREVIOUS_CLOSE_AND_SESSION_VWAP";
+            confirmation = "BUY_ONLY_AFTER_FIRST_5_MINUTE_CLOSE_ABOVE_PREVIOUS_CLOSE_AND_SESSION_VWAP";
             entry = snapshot.previousClose();
             reasons.add("Negative auction gap conflicts with the established trend");
         } else {

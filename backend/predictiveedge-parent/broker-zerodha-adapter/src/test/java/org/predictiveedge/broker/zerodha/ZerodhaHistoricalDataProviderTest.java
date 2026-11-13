@@ -1,6 +1,7 @@
 package org.predictiveedge.broker.zerodha;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Instant;
@@ -9,6 +10,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.predictiveedge.broker.domain.CandleInterval;
+import org.predictiveedge.broker.domain.BrokerFailure;
 import org.predictiveedge.broker.domain.HistoricalDataRequest;
 import org.predictiveedge.broker.domain.Instrument;
 import org.predictiveedge.broker.spi.BrokerContext;
@@ -39,6 +41,41 @@ class ZerodhaHistoricalDataProviderTest {
         assertThat(candles.getFirst().openInterest()).isEqualTo(1200L);
     }
 
+    @Test
+    void evictsRejectedTokenAndRequestsReconnect() {
+        var sessions = new TrackingSessionProvider();
+        var provider = new ZerodhaHistoricalDataProvider(sessions,
+                (uri, headers) -> { throw new ZerodhaHttpFailure(403,
+                        "{\"status\":\"error\",\"error_type\":\"TokenException\"}"); }, new ObjectMapper());
+
+        assertThatThrownBy(() -> provider.historicalCandles(context(), request()))
+                .isInstanceOf(BrokerFailure.class)
+                .hasMessageContaining("Reconnect Zerodha");
+        assertThat(sessions.authenticationFailed).isTrue();
+    }
+
+    @Test
+    void reportsMissingHistoricalPermissionWithoutEvictingValidToken() {
+        var sessions = new TrackingSessionProvider();
+        var provider = new ZerodhaHistoricalDataProvider(sessions,
+                (uri, headers) -> { throw new ZerodhaHttpFailure(403,
+                        "{\"status\":\"error\",\"error_type\":\"PermissionException\"}"); }, new ObjectMapper());
+
+        assertThatThrownBy(() -> provider.historicalCandles(context(), request()))
+                .isInstanceOf(BrokerFailure.class)
+                .hasMessageContaining("Enable historical data");
+        assertThat(sessions.authenticationFailed).isFalse();
+    }
+
+    private static BrokerContext context() {
+        return BrokerContext.withoutCredentials(UUID.randomUUID(), "ZD1234");
+    }
+
+    private static HistoricalDataRequest request() {
+        return new HistoricalDataRequest(new Instrument("NSE", "INFY"), "408065", CandleInterval.FIVE_MINUTES,
+                Instant.parse("2026-01-01T03:45:00Z"), Instant.parse("2026-01-01T04:00:00Z"), false, true);
+    }
+
     private static final class CapturingTransport implements ZerodhaTransport {
         private URI uri;
         private Map<String, String> headers;
@@ -53,6 +90,20 @@ class ZerodhaHistoricalDataProviderTest {
                       ["2026-01-01T09:20:00+0530",101.50,103.00,101.00,102.75,17000,1250]
                     ]}}
                     """;
+        }
+    }
+
+    private static final class TrackingSessionProvider implements ZerodhaSessionProvider {
+        private boolean authenticationFailed;
+
+        @Override
+        public ZerodhaSession sessionFor(BrokerContext context) {
+            return new ZerodhaSession("api-key", "access-token");
+        }
+
+        @Override
+        public void authenticationFailed(BrokerContext context, ZerodhaSession rejectedSession) {
+            authenticationFailed = true;
         }
     }
 }

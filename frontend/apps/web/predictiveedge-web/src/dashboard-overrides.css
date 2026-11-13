@@ -1,0 +1,43 @@
+.broker-grid{margin-top:22px;gap:12px}
+.broker-card{min-height:190px;padding:15px 17px;border-radius:14px;box-shadow:0 10px 28px #183e550d}
+.broker-card.zerodha{border-top-width:3px}
+.broker-logo{width:36px;height:36px;border-radius:10px;font-size:15px}
+.status{padding:5px 8px;font-size:8px}
+.broker-card h2{margin:11px 0 4px;font-size:17px}
+.broker-card>p{min-height:34px;line-height:1.4;font-size:11px}
+.broker-card .primary{padding:10px}
+.capability,.connection-detail{padding:9px 10px;border-radius:9px;font-size:10px}
+.connection-detail{gap:2px}
+
+.analysis-grid{grid-template-columns:1fr 1fr 1fr}
+.category-picker>p{margin-bottom:11px}
+.category-picker label{height:48px;padding:0 12px;display:flex;align-items:center;gap:10px;border:2px solid #075bea;border-radius:10px;background:#f7faff}
+.category-picker label>span{color:#075bea;font-size:20px}
+.category-picker select{width:100%;height:100%;border:0;outline:0;background:transparent;color:#10275c;font-size:11px;font-weight:900;cursor:pointer}
+
+.analysis-history{padding:20px;background:#fff}
+.history-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.history-heading h3{margin:0;color:#10275c}
+.history-heading p{margin:4px 0 0;color:#657a91;font-size:10px}
+.history-heading button{padding:8px 12px;border:1px solid #bfd0e5;border-radius:8px;background:#fff;color:#173762;font-weight:800}
+.history-list{margin-top:14px;display:grid;gap:7px}
+.history-list>button{padding:11px 13px;display:grid;grid-template-columns:90px 1.2fr 1.4fr 80px 1fr 65px;gap:10px;align-items:center;border:1px solid #dce5ef;border-radius:9px;background:#fff;color:#23405f;text-align:left;cursor:pointer}
+.history-list>button:hover{border-color:#075bea;background:#f7faff}
+.history-list>button:disabled{opacity:.55;cursor:not-allowed}
+.history-list span{display:grid;min-width:0}
+.history-list small{color:#7c8da0;font-size:6px;font-weight:900}
+.history-list b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
+.history-list i{color:#075bea;font-size:8px;font-style:normal;font-weight:900}
+.empty-history{padding:24px;border:1px dashed #b9c8da;border-radius:10px;color:#667a90;text-align:center;font-size:10px}
+
+@media(max-width:1050px){
+  .analysis-grid{grid-template-columns:1fr 1fr}
+  .history-list>button{grid-template-columns:80px 1fr 1fr 65px}
+  .history-list>button span:nth-child(3),.history-list>button span:nth-child(5){display:none}
+}
+@media(max-width:750px){
+  .analysis-grid{grid-template-columns:1fr}
+  .history-heading{align-items:flex-start;display:grid}
+  .history-list>button{grid-template-columns:80px 1fr 55px}
+  .history-list>button span:nth-child(4){display:none}
+}

@@ -13,6 +13,9 @@
     <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-connection-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>market-intelligence-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>market-intelligence-api</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>trendlyne-mcp-adapter</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>nse-mcp-adapter</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>intelligence-data-connector</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>trading-decision-infrastructure</artifactId><version>${project.version}</version></dependency>

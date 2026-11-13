@@ -25,7 +25,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-public final class JdbcBrokerAccountEvidenceStore implements BrokerAccountEvidencePort {
+public class JdbcBrokerAccountEvidenceStore implements BrokerAccountEvidencePort {
     private static final TypeReference<Map<String, BrokerFundsSegment>> FUNDS = new TypeReference<>() { };
     private static final TypeReference<List<BrokerPosition>> POSITIONS = new TypeReference<>() { };
     private static final TypeReference<List<BrokerHolding>> HOLDINGS = new TypeReference<>() { };

@@ -47,6 +47,7 @@ class ShadowDecisionServiceTest {
 
         assertThat(result.status()).isEqualTo(ShadowCaseStatus.RECORDED);
         assertThat(result.recommendation().action()).isEqualTo(RecommendationAction.BUY);
+        assertThat(result.finalAction()).isEqualTo(RecommendationAction.BUY);
         assertThat(stored.get()).isEqualTo(result);
     }
 
@@ -75,6 +76,7 @@ class ShadowDecisionServiceTest {
 
         assertThat(result.status()).isEqualTo(ShadowCaseStatus.REJECTED_POLICY);
         assertThat(result.policyReasons()).contains("NON_POSITIVE_EXPECTED_VALUE");
+        assertThat(result.finalAction()).isEqualTo(RecommendationAction.NO_TRADE);
     }
 
     @Test
@@ -87,10 +89,23 @@ class ShadowDecisionServiceTest {
                 .hasMessageContaining("one-user/one-equity");
     }
 
+    @Test
+    void failsClosedWhenFinalDecisionIntelligenceReturnsNoResult() {
+        ShadowDecisionService service = new ShadowDecisionService(SCOPE,
+                (scope, intent, cutoff) -> readyBundle(), bundle -> recommendation(BigDecimal.ONE),
+                (bundle, proposal) -> null, decisionCase -> true,
+                Clock.fixed(NOW, ZoneOffset.UTC), () -> "case-1");
+
+        assertThatThrownBy(() -> service.evaluate(intent(USER, EQUITY)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Final decision intelligence returned no result");
+    }
+
     private static ShadowDecisionService service(AITradingDecisionInputBundle bundle,
             AiRecommendationGateway gateway, ShadowDecisionCaseStore store) {
         return new ShadowDecisionService(SCOPE, (scope, intent, cutoff) -> bundle, gateway,
-                new ShadowRecommendationValidator(BigDecimal.valueOf(.55)), store,
+                new GovernedFinalDecisionIntelligence(
+                        new ShadowRecommendationValidator(BigDecimal.valueOf(.55)), "ollama"), store,
                 Clock.fixed(NOW, ZoneOffset.UTC), () -> "case-1");
     }
 
@@ -127,7 +142,7 @@ class ShadowDecisionServiceTest {
         return new AIRecommendation("recommendation-1", "bundle-1", SCOPE, RecommendationAction.BUY,
                 NOW, BigDecimal.valueOf(.65), expectedValue, BigDecimal.valueOf(99.90),
                 BigDecimal.valueOf(100.10), NOW.plusSeconds(20), NOW.plusSeconds(120),
-                BigDecimal.valueOf(98.50), BigDecimal.valueOf(103), "model-v1",
+                BigDecimal.valueOf(98.50), BigDecimal.valueOf(103), "ollama:qwen3:8b",
                 "Breakout evidence exceeds the configured threshold", List.of("resource-CHART"));
     }
 }

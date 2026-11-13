@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Causal evidence batch store and point-in-time bundle query for the fixed shadow scope. */
-public final class JdbcShadowEvidenceStore implements ShadowEvidenceBatchStore, ShadowDecisionInputQuery {
+public class JdbcShadowEvidenceStore implements ShadowEvidenceBatchStore, ShadowDecisionInputQuery {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final Supplier<String> bundleIds;

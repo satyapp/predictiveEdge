@@ -21,7 +21,7 @@ import org.predictiveedge.marketintelligence.domain.ObservationSubjectType;
 
 /** Loads tenant-owned causal OHLCV history and evaluates one exchange pre-open snapshot. */
 public final class PreOpenIntradayAnalysisService {
-    private static final int MAXIMUM_HISTORY_BARS = 15_000;
+    private static final int MAXIMUM_HISTORY_BARS = 30_000;
     private final MarketBarQueryPort bars;
     private final PreOpenAuctionQueryPort preOpenSnapshots;
     private final PreOpenIntradayAnalyzer analyzer;
@@ -96,8 +96,8 @@ public final class PreOpenIntradayAnalysisService {
             if (analysisCutoff.isAfter(knowledgeCutoff))
                 throw new IllegalArgumentException("Analysis cutoff cannot follow knowledge cutoff");
             Objects.requireNonNull(historyWindow, "History window is required");
-            if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(180)) > 0)
-                throw new IllegalArgumentException("History window must be between 7 and 180 days");
+            if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(365)) > 0)
+                throw new IllegalArgumentException("History window must be between 7 and 365 days");
         }
     }
 
@@ -125,8 +125,8 @@ public final class PreOpenIntradayAnalysisService {
             if (analysisCutoff.isAfter(knowledgeCutoff))
                 throw new IllegalArgumentException("Analysis cutoff cannot follow knowledge cutoff");
             Objects.requireNonNull(historyWindow, "History window is required");
-            if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(180)) > 0)
-                throw new IllegalArgumentException("History window must be between 7 and 180 days");
+            if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(365)) > 0)
+                throw new IllegalArgumentException("History window must be between 7 and 365 days");
         }
     }
 }

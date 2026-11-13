@@ -12,23 +12,23 @@ import org.predictiveedge.decision.domain.ShadowDecisionCase;
 import org.predictiveedge.decision.domain.ShadowScope;
 import org.predictiveedge.decision.domain.TraderIntent;
 
-/** One-user/one-equity shadow orchestrator. No broker execution port exists by design. */
+/** Two-stage shadow orchestrator: first-level model proposal, then mandatory final intelligence. */
 public final class ShadowDecisionService {
     private final ShadowScope configuredScope;
     private final ShadowDecisionInputQuery inputQuery;
-    private final AiRecommendationGateway aiGateway;
-    private final ShadowRecommendationValidator validator;
+    private final AiRecommendationGateway firstLevelGateway;
+    private final FinalDecisionIntelligence finalIntelligence;
     private final ShadowDecisionCaseStore caseStore;
     private final Clock clock;
     private final Supplier<String> caseIds;
 
     public ShadowDecisionService(ShadowScope configuredScope, ShadowDecisionInputQuery inputQuery,
-            AiRecommendationGateway aiGateway, ShadowRecommendationValidator validator,
+            AiRecommendationGateway firstLevelGateway, FinalDecisionIntelligence finalIntelligence,
             ShadowDecisionCaseStore caseStore, Clock clock, Supplier<String> caseIds) {
         this.configuredScope = Objects.requireNonNull(configuredScope, "Configured shadow scope is required");
         this.inputQuery = Objects.requireNonNull(inputQuery, "Input query is required");
-        this.aiGateway = Objects.requireNonNull(aiGateway, "AI gateway is required");
-        this.validator = Objects.requireNonNull(validator, "Recommendation validator is required");
+        this.firstLevelGateway = Objects.requireNonNull(firstLevelGateway, "First-level AI gateway is required");
+        this.finalIntelligence = Objects.requireNonNull(finalIntelligence, "Final decision intelligence is required");
         this.caseStore = Objects.requireNonNull(caseStore, "Case store is required");
         this.clock = Objects.requireNonNull(clock, "Clock is required");
         this.caseIds = Objects.requireNonNull(caseIds, "Case id supplier is required");
@@ -52,8 +52,9 @@ public final class ShadowDecisionService {
                     List.of("INPUT_BUNDLE_NOT_READY"), cutoff);
         } else {
             AIRecommendation recommendation = Objects.requireNonNull(
-                    aiGateway.recommend(bundle), "AI gateway returned no recommendation");
-            RecommendationValidationResult validation = validator.validate(bundle, recommendation);
+                    firstLevelGateway.recommend(bundle), "First-level AI gateway returned no proposal");
+            RecommendationValidationResult validation = finalIntelligence.evaluate(bundle, recommendation);
+            if (validation == null) throw new IllegalStateException("Final decision intelligence returned no result");
             decisionCase = new ShadowDecisionCase(caseId, bundle, recommendation,
                     validation.accepted() ? ShadowCaseStatus.RECORDED : ShadowCaseStatus.REJECTED_POLICY,
                     validation.reasons(), cutoff);

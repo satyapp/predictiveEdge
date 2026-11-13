@@ -26,6 +26,7 @@ public class PlatformSecurityConfiguration {
                         .requestMatchers("/api/identity/v1/me", "/api/identity/v1/auth/logout").authenticated()
                         .requestMatchers("/api/broker/v1/**").authenticated()
                         .requestMatchers("/api/market-intelligence/v1/**").authenticated()
+                        .requestMatchers("/api/chart-intelligence/v1/**").authenticated()
                         .requestMatchers("/api/decision/v1/**").authenticated()
                         .requestMatchers("/api/trade-guardian/v1/**").authenticated()
                         .anyRequest().denyAll())

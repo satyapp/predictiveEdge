@@ -28,8 +28,9 @@ foreign-key boundary.
    - enforces the configured user/equity;
    - refuses inactive Trader Intent;
    - prevents an AI call when input is incomplete or stale;
-   - calls `AiRecommendationGateway` as the sole recommendation origin;
-   - applies a reject-only policy validator; and
+   - calls local Ollama through `AiRecommendationGateway` for a first-level proposal;
+   - requires `GovernedFinalDecisionIntelligence` to execute over the complete
+     bundle and reject or approve that proposal; and
    - appends the complete input, raw structured AI result and validation result.
 4. Directional recommendations require:
    - all resources ready and causal;
@@ -90,19 +91,22 @@ no broker-write port.
 
 ## AI provider environments
 
-The recommendation boundary now supports two explicitly selected structured-output
-providers behind the same `AiRecommendationGateway` contract:
+The first-level analysis boundary supports structured model proposals behind the
+`AiRecommendationGateway` contract. Local Ollama is the required default:
 
-- Development: `PE_AI_PROVIDER=ollama`, using the local Ollama `/api/chat`
-  endpoint and a configured local model (currently `qwen3:8b`).
-- QA/UAT: `PE_AI_PROVIDER=openai`, using the OpenAI Responses API and the
-  configured QA/UAT model.
-- Disabled: `PE_AI_PROVIDER=none` (the default runtime setting).
+- Default: `PE_AI_PROVIDER=ollama`, using the local Ollama `/api/chat` endpoint
+  and configured local model (currently `qwen3:8b`).
+- Final provenance gate: `PE_SHADOW_FIRST_LEVEL_PROVIDER=ollama`.
+- Disabled: `PE_AI_PROVIDER=none` explicitly disables first-level analysis.
+- The OpenAI adapter remains available for controlled experiments, but its
+  proposal is rejected by the final gate while Ollama provenance is required.
 
 There is no automatic provider fallback. An Ollama failure cannot silently send
-personal trading evidence to OpenAI, and an OpenAI failure cannot silently change
-the evaluated model. Provider, model, prompt, evidence hashes and output remain
-part of the decision audit trail.
+personal trading evidence elsewhere. Provider, model, prompt, evidence hashes
+and output remain part of the decision audit trail. After Ollama returns, the
+mandatory `GovernedFinalDecisionIntelligence` gate executes over all twelve
+resources. A proposal is never recorded as an approved BUY/SELL when that final
+gate is absent, returns no result, rejects provenance, or finds a failed policy.
 
 Before either provider is called, the gateway resolves the exact immutable JSON
 payload for all twelve mandatory evidence resources. Each payload must match its
@@ -118,6 +122,11 @@ explicit environment settings. Output is bounded because the recommendation
 schema is compact and unbounded generation is unsafe; input evidence is not
 trimmed to meet that output bound. A deployment must size the selected local
 model's context window for the complete governed input.
+
+The current local Windows/Vulkan profile is verified at an 8,192-token context.
+The previous 32,768-token default exhausted pinned memory on this machine, so
+the application now defaults to `PE_OLLAMA_CONTEXT_WINDOW_TOKENS=8192`. Evidence
+that does not fit must block the evaluation; it must not be silently truncated.
 
 `MarketContextSnapshot` and `ChartSnapshot` now have tenant-owned, append-only
 PostgreSQL stores. Their queries enforce analysis, knowledge and availability

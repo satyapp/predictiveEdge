@@ -65,7 +65,7 @@ public class PreOpenIntradayAnalysisController {
             @NotBlank String brokerAccountId,
             @NotNull Instant analysisCutoff,
             @NotNull Instant knowledgeCutoff,
-            @Min(7) @Max(180) int historyDays,
+            @Min(7) @Max(365) int historyDays,
             @NotEmpty @Size(max = 25) List<@Valid SnapshotRequest> snapshots) { }
 
     public record SnapshotRequest(
@@ -96,7 +96,7 @@ public class PreOpenIntradayAnalysisController {
             @NotNull LocalDate tradingDate,
             @NotNull Instant analysisCutoff,
             @NotNull Instant knowledgeCutoff,
-            @Min(7) @Max(180) int historyDays,
+            @Min(7) @Max(365) int historyDays,
             @NotEmpty @Size(max = 25) List<@Valid InstrumentRequest> instruments) { }
 
     public record InstrumentRequest(@NotBlank String venue, @NotBlank String symbol) { }

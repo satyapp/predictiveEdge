@@ -38,4 +38,11 @@ public record ShadowDecisionCase(
             }
         }
     }
+
+    /** Only this derived action may be shown as the final advisory call. */
+    public RecommendationAction finalAction() {
+        if (status == ShadowCaseStatus.BLOCKED_INPUT) return RecommendationAction.INSUFFICIENT_EVIDENCE;
+        if (status == ShadowCaseStatus.REJECTED_POLICY) return RecommendationAction.NO_TRADE;
+        return recommendation.action();
+    }
 }

@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { AuthSession, clearStoredSession, loadStoredSession, login, logout, register, Registration, resendVerificationOtp, storeSession, toIndianE164, verifyOtp } from './auth';
 import { beginZerodhaConnection, BrokerOverview, disconnectZerodhaConnection, loadBrokerOverview, releaseZerodhaBrowserLease } from './broker';
+import { MarketIntelligenceDashboard } from './MarketIntelligenceDashboard';
 import './broker.css';
+import './preopen-diagnostics.css';
+import './intelligence-dashboard.css';
+import './dashboard-overrides.css';
 
 type Screen = 'login' | 'register' | 'verify';
 
@@ -171,6 +175,7 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
       <article className="broker-card"><div className="card-top"><span className="broker-logo paper">P</span><span className="status connected">AVAILABLE</span></div><h2>Paper Trading</h2><p>Risk-free simulated fills with isolated cash and positions.</p><div className="capability"><b>Market orders</b><span>Enabled</span></div></article>
       <article className="broker-card"><div className="card-top"><span className="broker-logo backtest">B</span><span className="status connected">PRIORITY</span></div><h2>Backtesting</h2><p>Replay Zerodha candles through Paper Trading before considering live execution.</p><div className="capability"><b>Chronological replay</b><span>Enabled</span></div></article>
     </div>
+    <MarketIntelligenceDashboard session={session} broker={broker} />
     {brokerError && <p className="error" role="alert">{brokerError}</p>}
     <div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
     <div className="identity-summary"><span><small>VERIFIED EMAIL</small>{session.user.email}</span><span><small>VERIFIED MOBILE</small>{session.user.mobileNumber}</span></div>

@@ -26,6 +26,9 @@
     <module>../market-intelligence-application</module>
     <module>../market-intelligence-infrastructure</module>
     <module>../market-intelligence-api</module>
+    <module>../trendlyne-mcp-adapter</module>
+    <module>../nse-mcp-adapter</module>
+    <module>../intelligence-data-connector</module>
     <module>../trading-decision-domain</module>
     <module>../chart-intelligence-domain</module>
     <module>../chart-intelligence-application</module>

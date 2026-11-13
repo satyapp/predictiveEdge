@@ -89,12 +89,24 @@ predictiveedge:
     finality-policy-version: ${PE_MARKET_INTELLIGENCE_FINALITY_POLICY_VERSION:finality-v1}
     session-retention: ${PE_MARKET_INTELLIGENCE_SESSION_RETENTION:PT24H}
     retention-sweep-milliseconds: ${PE_MARKET_INTELLIGENCE_RETENTION_SWEEP_MILLISECONDS:60000}
+  trendlyne:
+    mcp:
+      enabled: ${PE_TRENDLYNE_MCP_ENABLED:false}
+      url: ${PE_TRENDLYNE_MCP_URL:}
+      request-timeout: ${PE_TRENDLYNE_MCP_REQUEST_TIMEOUT:PT30S}
+  nse:
+    mcp:
+      enabled: ${PE_NSE_MCP_ENABLED:false}
+      bhavcopy-url: ${PE_NSE_MCP_BHAVCOPY_URL:https://mcp.nseindia.in/bhavcopy/cm/mcp}
+      cm-market-url: ${PE_NSE_MCP_CM_MARKET_URL:https://mcp.nseindia.in/cmmkt/mcp}
+      request-timeout: ${PE_NSE_MCP_REQUEST_TIMEOUT:PT30S}
   shadow-decision:
     enabled: ${PE_SHADOW_DECISION_ENABLED:false}
     user-id: ${PE_SHADOW_USER_ID:}
     venue: ${PE_SHADOW_VENUE:NSE}
     instrument-id: ${PE_SHADOW_INSTRUMENT_ID:}
     market-context-horizon: ${PE_SHADOW_MARKET_CONTEXT_HORIZON:INTRADAY}
+    first-level-provider: ${PE_SHADOW_FIRST_LEVEL_PROVIDER:ollama}
     minimum-directional-probability: ${PE_SHADOW_MINIMUM_DIRECTIONAL_PROBABILITY:0.55}
   safety-assessment:
     enabled: ${PE_SAFETY_ASSESSMENT_ENABLED:false}
@@ -121,12 +133,12 @@ predictiveedge:
       maximum-account-age: ${PE_PORTFOLIO_MAXIMUM_ACCOUNT_AGE:PT5S}
       validity: ${PE_PORTFOLIO_VALIDITY:PT2S}
   ai:
-    provider: ${PE_AI_PROVIDER:none}
+    provider: ${PE_AI_PROVIDER:ollama}
     ollama:
       model: ${PE_OLLAMA_MODEL:qwen3:8b}
       endpoint: ${PE_OLLAMA_ENDPOINT:http://localhost:11434/api/chat}
       timeout-seconds: ${PE_OLLAMA_TIMEOUT_SECONDS:360}
-      context-window-tokens: ${PE_OLLAMA_CONTEXT_WINDOW_TOKENS:32768}
+      context-window-tokens: ${PE_OLLAMA_CONTEXT_WINDOW_TOKENS:8192}
       maximum-output-tokens: ${PE_OLLAMA_MAXIMUM_OUTPUT_TOKENS:1024}
     openai:
       api-key: ${OPENAI_API_KEY:}

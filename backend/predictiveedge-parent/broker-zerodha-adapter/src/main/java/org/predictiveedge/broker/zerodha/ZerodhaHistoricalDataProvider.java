@@ -45,10 +45,40 @@ public final class ZerodhaHistoricalDataProvider implements HistoricalMarketData
         }
         ZerodhaSession session = sessions.sessionFor(context);
         URI uri = historicalUri(request);
-        String body = transport.get(uri, Map.of(
-                "X-Kite-Version", "3",
-                "Authorization", "token " + session.apiKey() + ":" + session.accessToken()));
+        String body;
+        try {
+            body = transport.get(uri, Map.of(
+                    "X-Kite-Version", "3",
+                    "Authorization", "token " + session.apiKey() + ":" + session.accessToken()));
+        } catch (ZerodhaHttpFailure failure) {
+            throw mappedFailure(context, session, failure);
+        }
         return parseCandles(body, request);
+    }
+
+    private BrokerFailure mappedFailure(
+            BrokerContext context, ZerodhaSession session, ZerodhaHttpFailure failure) {
+        String errorType = "";
+        try {
+            errorType = json.readTree(failure.responseBody()).path("error_type").asText("");
+        } catch (Exception ignored) {
+            // Fail closed with a status-specific message when Zerodha did not return its normal JSON envelope.
+        }
+        if (failure.statusCode() == 403 && "TokenException".equalsIgnoreCase(errorType)) {
+            sessions.authenticationFailed(context, session);
+            return new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
+                    "Zerodha session was rejected. Reconnect Zerodha to issue a fresh daily access token");
+        }
+        if (failure.statusCode() == 403 && "PermissionException".equalsIgnoreCase(errorType)) {
+            return new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
+                    "Zerodha denied historical-data access. Enable historical data for the configured Kite app/account");
+        }
+        if (failure.statusCode() == 429) {
+            return new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
+                    "Zerodha historical-data rate limit was reached. Retry after the current analysis completes");
+        }
+        return new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
+                "Zerodha historical-data request failed with HTTP " + failure.statusCode());
     }
 
     private URI historicalUri(HistoricalDataRequest request) {

@@ -14,7 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /** PostgreSQL append-only store for the one-user/one-equity shadow MVP. */
-public final class JdbcShadowDecisionStore implements ShadowDecisionCaseStore, ShadowOutcomeStore {
+public class JdbcShadowDecisionStore implements ShadowDecisionCaseStore, ShadowOutcomeStore {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
 
