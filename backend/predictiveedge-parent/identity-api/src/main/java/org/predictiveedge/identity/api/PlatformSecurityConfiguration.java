@@ -28,6 +28,7 @@ public class PlatformSecurityConfiguration {
                         .requestMatchers("/api/broker/v1/**").authenticated()
                         .requestMatchers("/api/fyers/v1/**").authenticated()
                         .requestMatchers("/api/fyers-automate/v1/**").authenticated()
+                        .requestMatchers("/api/stock-pipeline/v1/**").authenticated()
                         .requestMatchers("/api/market-intelligence/v1/**").authenticated()
                         .requestMatchers("/api/chart-intelligence/v1/**").authenticated()
                         .requestMatchers("/api/decision/v1/**").authenticated()

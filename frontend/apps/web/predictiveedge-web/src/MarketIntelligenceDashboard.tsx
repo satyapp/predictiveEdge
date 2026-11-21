@@ -117,8 +117,9 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       {historyError && <p className="error" role="alert">{historyError}</p>}
       {!historyBusy && historyItems.length === 0 && !historyError && <p className="empty-history">No saved analyses yet. The next completed run will appear here.</p>}
       <div className="history-list">{historyItems.map((run) => {
-        const dataOnly = run.resultKind === 'PRE_OPEN_DETERMINISTIC' || run.resultKind === 'MARKET_SCREEN';
-        return <button type="button" key={run.runId} onClick={() => openHistory(run)} disabled={historyBusy || dataOnly}><span><small>TRADING DATE</small><b>{run.tradingDate}</b></span><span><small>CATEGORY</small><b>{categories.find((value) => value.value === run.category)?.label ?? run.category.replaceAll('_', ' ')}</b></span><span><small>FILE</small><b>{run.fileName}</b></span><span><small>CANDIDATES</small><b>{run.candidateCount}</b></span><span><small>MODEL</small><b>{run.stageOneModel}</b></span><i>{dataOnly ? 'DATA ONLY' : 'OPEN ›'}</i></button>;
+        const levelTwo = (run.resultKind as string) === 'LEVEL_TWO_AI';
+        const dataOnly = levelTwo || run.resultKind === 'PRE_OPEN_DETERMINISTIC' || run.resultKind === 'MARKET_SCREEN';
+        return <button type="button" key={run.runId} onClick={() => openHistory(run)} disabled={historyBusy || dataOnly}><span><small>TRADING DATE</small><b>{run.tradingDate}</b></span><span><small>CATEGORY</small><b>{categories.find((value) => value.value === run.category)?.label ?? run.category.replaceAll('_', ' ')}</b></span><span><small>FILE</small><b>{run.fileName}</b></span><span><small>CANDIDATES</small><b>{run.candidateCount}</b></span><span><small>MODEL</small><b>{run.stageOneModel}</b></span><i>{levelTwo ? 'LEVEL 2 · SEE STOCK PIPELINE' : dataOnly ? 'DATA ONLY' : 'OPEN ›'}</i></button>;
       })}</div>
     </div> : <>
       <form className="analysis-console" onSubmit={submit}>
