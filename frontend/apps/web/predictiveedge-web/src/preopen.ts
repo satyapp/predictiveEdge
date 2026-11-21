@@ -48,6 +48,26 @@ export type OllamaCandidate = {
   risk: string;
 };
 
+export type OllamaAnalysis = {
+  model: string;
+  generatedAt: string;
+  invoked: boolean;
+  marketTone: 'BULLISH' | 'BEARISH' | 'MIXED' | 'NO_SETUP';
+  overview: string;
+  candidates: OllamaCandidate[];
+  cautions: string[];
+};
+
+export type StageOneGoldenCopy = {
+  schemaVersion: 'stage-one-golden-copy-v1';
+  category: string;
+  frozenAt: string;
+  sourceFingerprint: string;
+  intelligenceEvidenceJson: string;
+  stageOneAnalysis: OllamaAnalysis;
+  stageTwoStatus: 'PLANNED_PHASE_2';
+};
+
 export type PreOpenAnalysisResponse = {
   authority: 'PRELIMINARY_NOT_FINAL';
   deterministic: {
@@ -65,15 +85,8 @@ export type PreOpenAnalysisResponse = {
     failures: { venue: string; symbol: string; reason: string }[];
     rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   };
-  ollama: {
-    model: string;
-    generatedAt: string;
-    invoked: boolean;
-    marketTone: 'BULLISH' | 'BEARISH' | 'MIXED' | 'NO_SETUP';
-    overview: string;
-    candidates: OllamaCandidate[];
-    cautions: string[];
-  };
+  ollama: OllamaAnalysis;
+  goldenCopy: StageOneGoldenCopy;
 };
 
 export async function analyzePreOpenCsv(input: {

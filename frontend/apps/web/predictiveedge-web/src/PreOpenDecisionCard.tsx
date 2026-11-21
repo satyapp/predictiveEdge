@@ -1,5 +1,6 @@
 import { HistoricalSetupAnalysis, OllamaCandidate, RankedPreOpenCandidate } from './preopen';
 import { MarketScreenAnalysisResponse, MarketScreenType } from './marketScreens';
+import { TrendlyneStockAnalysis } from './TrendlyneStockAnalysis';
 
 type Props = {
   candidate: OllamaCandidate;
@@ -99,6 +100,8 @@ export function PreOpenDecisionCard({ candidate, facts, ranking, capital, riskPe
       <div><small>PRIMARY RISK / KILL CONDITION</small><p>{candidate.risk}</p></div>
     </div>
 
+    <TrendlyneStockAnalysis symbol={candidate.symbol} />
+
     <div className="action-rules">
       <b>Action discipline</b>
       <ul>
@@ -189,6 +192,8 @@ export function MarketScreenDecisionCard({ candidate, facts, ranking, screenType
       <div><small>OLLAMA THESIS</small><p>{candidate.thesis}</p></div>
       <div><small>PRIMARY RISK / KILL CONDITION</small><p>{candidate.risk}</p></div>
     </div>
+
+    <TrendlyneStockAnalysis symbol={candidate.symbol} />
 
     <div className="action-rules"><b>Action discipline</b><ul>
       <li>{directional ? `Do not ${side.toLowerCase()} before the opening-range and VWAP trigger is confirmed.` : 'Do not initiate a position from this screen result.'}</li>

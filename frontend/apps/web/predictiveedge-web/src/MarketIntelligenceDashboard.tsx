@@ -41,6 +41,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
   const hasResult = Boolean(preOpenResult || screenResult);
   const selectedCategory = categories.find((value) => value.value === category)!;
   const candidateCount = preOpenResult?.ollama.candidates.length ?? screenResult?.ollama.candidates.length ?? 0;
+  const goldenCopy = preOpenResult?.goldenCopy ?? screenResult?.goldenCopy;
   const deterministic = useMemo(() => new Map(preOpenResult?.deterministic.analyses.map((value) => [value.assessment.symbol, value])), [preOpenResult]);
   const rankings = useMemo(() => new Map([
     ...(preOpenResult?.deterministic.ranking.probableGainers ?? []),
@@ -157,7 +158,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
 
         {resultTab === 'STAGE_ONE' && <>
           <div className="ollama-overview"><div><small>STAGE‑1 MODEL</small><b>{preOpenResult?.ollama.model ?? screenResult?.ollama.model}</b></div>{(preOpenResult?.ollama ?? screenResult?.ollama) && <span className={`tone ${(preOpenResult?.ollama.marketTone ?? screenResult!.ollama.marketTone).toLowerCase()}`}>{preOpenResult?.ollama.marketTone ?? screenResult?.ollama.marketTone}</span>}<p>{preOpenResult?.ollama.overview ?? screenResult?.ollama.overview}</p></div>
-          <div className="analysis-meta"><span><b>{preOpenResult?.deterministic.parsedSnapshots ?? screenResult?.deterministic.parsedRows}</b> usable rows</span><span><b>{preOpenResult?.deterministic.shortlistedForHistory ?? screenResult?.deterministic.analyses.length ?? 0}</b> Zerodha histories</span><span><b>{preOpenResult?.deterministic.failures.length ?? screenResult?.deterministic.failures.length ?? 0}</b> failures</span><span><b>{candidateCount}</b> recommendations</span></div>
+          <div className="analysis-meta"><span><b>{preOpenResult?.deterministic.parsedSnapshots ?? screenResult?.deterministic.parsedRows}</b> usable rows</span><span><b>{preOpenResult?.deterministic.shortlistedForHistory ?? screenResult?.deterministic.analyses.length ?? 0}</b> Zerodha histories</span><span><b>{preOpenResult?.deterministic.failures.length ?? screenResult?.deterministic.failures.length ?? 0}</b> failures</span><span><b>{candidateCount}</b> recommendations</span>{goldenCopy && <span title={goldenCopy.sourceFingerprint}><b>12</b> modules · golden copy {goldenCopy.sourceFingerprint.slice(0, 10)}…</span>}</div>
           <div className="risk-controls"><div><small>ILLUSTRATIVE POSITION-SIZE INPUTS</small><b>Set the maximum loss budget before reviewing a setup</b><p>Margin, slippage, correlation and portfolio exposure remain outside this calculator.</p></div><label>Capital (₹)<input type="number" min="1" step="1000" value={capital} onChange={(event) => setCapital(Number(event.target.value))} /></label><label>Risk per trade (%)<input type="number" min="0.05" max="5" step="0.05" value={riskPercent} onChange={(event) => setRiskPercent(Number(event.target.value))} /></label></div>
           <div className="decision-list">
             {preOpenResult?.ollama.candidates.map((candidate) => <PreOpenDecisionCard key={candidate.symbol} candidate={candidate} facts={deterministic.get(candidate.symbol)} ranking={rankings.get(candidate.symbol)} capital={capital} riskPercent={riskPercent} />)}
@@ -166,7 +167,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
           {preOpenResult && preOpenResult.deterministic.failures.length > 0 && <div className="failure-block"><b>Historical analysis failures</b>{preOpenResult.deterministic.failures.map((value) => <div className="diagnostic-row" key={`${value.venue}:${value.symbol}`}><span>{value.symbol}</span><span>FAILED</span><span>{value.reason}</span></div>)}</div>}
           {screenResult && screenResult.deterministic.failures.length > 0 && <div className="failure-block"><b>Historical analysis failures</b>{screenResult.deterministic.failures.map((value) => <div className="diagnostic-row" key={`${value.venue}:${value.symbol}`}><span>{value.symbol}</span><span>FAILED</span><span>{value.reason}</span></div>)}</div>}
         </>}
-        <div className="stage-two-callout"><div><b>Stage‑2 OpenAI refinement</b><p>Phase 2 will send the immutable Stage‑1 evidence bundle and Ollama report to OpenAI only when the user requests it. The connector layer stays out of this stage.</p></div><button type="button" disabled>Run Advanced Analysis · Phase 2</button></div>
+        <div className="stage-two-callout"><div><b>Stage‑2 OpenAI refinement</b><p>Phase 2 will receive the persisted golden copy: all 12 module evidence views plus the complete Ollama Stage‑1 analysis. It will not re-query connectors, Zerodha, or the source CSV.</p></div><button type="button" disabled>Run Advanced Analysis · Phase 2</button></div>
       </div>}
     </>}
   </section>;

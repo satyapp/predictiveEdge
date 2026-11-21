@@ -19,6 +19,7 @@ import java.util.Objects;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort;
+import org.predictiveedge.chart.application.StageOneAiResult;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
 
 /** Local Ollama adapter for preliminary interpretation of governed pre-open candidates. */
@@ -26,6 +27,10 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
     private static final String SYSTEM = """
             You are PredictiveEdge's preliminary pre-open analyst. Interpret only the supplied deterministic facts.
             Never call an order final, never claim execution, and never invent a symbol, price, indicator or event.
+            Evaluate every represented intelligence module: Market, Chart, Scanner, Strategy, Risk, Portfolio,
+            Learning, Data Quality, Regime Drift, Execution, Validation and Calibration. Respect provider status;
+            unavailable evidence is not negative evidence. Trendlyne technical and fundamental/SWOT evidence is
+            supplementary context. Identify disagreements and never override the supplied deterministic outcome.
             Preserve each supplied deterministic outcome exactly: BUY_CANDIDATE means LONG_WATCH,
             SELL_CANDIDATE means SHORT_WATCH, WAIT means WAIT, NO_TRADE means NO_TRADE, and
             INSUFFICIENT_EVIDENCE means INSUFFICIENT_EVIDENCE. Explain the evidence, the required confirmation,
@@ -41,9 +46,12 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
     private final int contextTokens;
     private final int outputTokens;
     private final Clock clock;
+    private final StageOneIntelligenceEvidenceCollector intelligence;
+    private final StageOneGoldenCopyFactory goldenCopies;
 
     public OllamaPreOpenAnalysisAdapter(ObjectMapper json, HttpClient http, URI endpoint, String model,
-            Duration timeout, int contextTokens, int outputTokens, Clock clock) {
+            Duration timeout, int contextTokens, int outputTokens, Clock clock,
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
         this.json = Objects.requireNonNull(json);
         this.http = Objects.requireNonNull(http);
         this.endpoint = Objects.requireNonNull(endpoint);
@@ -56,25 +64,30 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
         this.contextTokens = contextTokens;
         this.outputTokens = outputTokens;
         this.clock = Objects.requireNonNull(clock);
+        this.intelligence = Objects.requireNonNull(intelligence);
+        this.goldenCopies = Objects.requireNonNull(goldenCopies);
     }
 
     @Override
-    public PreOpenOllamaAnalysis analyze(PreOpenCsvAnalysisService.Result result) {
+    public StageOneAiResult analyze(PreOpenCsvAnalysisService.Result result) {
         Objects.requireNonNull(result, "Deterministic result is required");
+        String evidenceJson = write(compact(result));
         Map<String, String> expected = expectedOutcomes(result);
         if (expected.isEmpty()) {
             String overview = result.failures().isEmpty()
                     ? "No stock completed deterministic historical analysis, so Qwen was not invoked."
                     : "Historical analysis failed for every shortlisted stock, so Qwen was not invoked.";
-            return new PreOpenOllamaAnalysis(model, clock.instant(), false, "NO_SETUP", overview, List.of(),
+            var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), false, "NO_SETUP", overview, List.of(),
                     List.of("Review the per-stock failures below and rerun after the data problem is resolved."));
+            return goldenCopies.freeze("PRE_OPEN", evidenceJson, analysis);
         }
         ObjectNode request = json.createObjectNode();
         request.put("model", model).put("stream", false).put("think", false);
         ArrayNode messages = request.putArray("messages");
         messages.addObject().put("role", "system").put("content", SYSTEM);
         messages.addObject().put("role", "user").put("content",
-                "Interpret this deterministic pre-open evidence JSON:\n" + write(compact(result)));
+                "Evaluate all twelve intelligence modules in this deterministic pre-open evidence JSON:\n"
+                        + evidenceJson);
         request.set("format", schema());
         request.putObject("options").put("temperature", 0).put("num_ctx", contextTokens)
                 .put("num_predict", outputTokens);
@@ -102,8 +115,9 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
                 throw new IllegalStateException("Ollama candidate symbols or directions differ from deterministic evidence");
             List<String> cautions = new ArrayList<>();
             content.path("cautions").forEach(value -> cautions.add(value.asText()));
-            return new PreOpenOllamaAnalysis(model, clock.instant(), true, content.path("market_tone").asText(),
-                    content.path("overview").asText(), candidates, cautions);
+            var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
+                    content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
+            return goldenCopies.freeze("PRE_OPEN", evidenceJson, analysis);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Ollama analysis was interrupted", failure);
@@ -144,6 +158,9 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
             node.put("confirmation_rule", assessment.confirmationRule());
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
+        root.set("intelligence_evidence", intelligence.collect(
+                result.analyses().stream().limit(15).map(value -> value.assessment().symbol()).toList(),
+                result.completedAt()));
         return root;
     }
 

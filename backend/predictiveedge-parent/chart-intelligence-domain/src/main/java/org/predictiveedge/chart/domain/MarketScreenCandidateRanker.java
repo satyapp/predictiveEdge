@@ -18,8 +18,6 @@ public final class MarketScreenCandidateRanker {
         Objects.requireNonNull(observations, "Screen observations are required");
         if (observations.isEmpty()) return new RankedScreen("market-screen-v1", false, List.of());
         MarketScreenType type = observations.getFirst().screenType();
-        if (type != MarketScreenType.TOP_GAINERS && type != MarketScreenType.TOP_LOSERS)
-            throw new IllegalArgumentException("The v1 ranker currently supports top gainers and top losers only");
         if (observations.stream().anyMatch(value -> value.screenType() != type))
             throw new IllegalArgumentException("A ranked screen cannot mix source types");
 
@@ -29,8 +27,9 @@ public final class MarketScreenCandidateRanker {
             BigDecimal move = value.percentChange().abs().divide(BigDecimal.valueOf(5), MC)
                     .min(BigDecimal.ONE).multiply(BigDecimal.valueOf(45), MC);
             BigDecimal range = value.high().subtract(value.low());
+            boolean longDirection = longDirection(value);
             BigDecimal favorableClose = range.signum() == 0 ? new BigDecimal("0.50")
-                    : type == MarketScreenType.TOP_GAINERS
+                    : longDirection
                         ? value.lastPrice().subtract(value.low()).divide(range, MC)
                         : value.high().subtract(value.lastPrice()).divide(range, MC);
             BigDecimal close = favorableClose.max(BigDecimal.ZERO).min(BigDecimal.ONE)
@@ -46,7 +45,7 @@ public final class MarketScreenCandidateRanker {
                     "Within-file volume rank contributed " + volume.setScale(1, HALF_UP) + " of 15 points",
                     "Within-file turnover rank contributed " + turnover.setScale(1, HALF_UP) + " of 20 points");
             ranked.add(new RankedCandidate(0, value.symbol(),
-                    type == MarketScreenType.TOP_GAINERS ? "LONG_WATCH" : "SHORT_WATCH",
+                    longDirection ? "LONG_WATCH" : "SHORT_WATCH",
                     score, band(score), value.percentChange(), value.lastPrice(), value.volume(), value.turnover(),
                     value.sourceRank(), reasons));
         }
@@ -67,6 +66,15 @@ public final class MarketScreenCandidateRanker {
             throw new IllegalArgumentException("Top-gainer row must have positive %CHANGE: " + value.symbol());
         if (value.screenType() == MarketScreenType.TOP_LOSERS && value.percentChange().signum() >= 0)
             throw new IllegalArgumentException("Top-loser row must have negative %CHANGE: " + value.symbol());
+    }
+
+    private static boolean longDirection(MarketScreenObservation value) {
+        return switch (value.screenType()) {
+            case TOP_GAINERS, NEW_52_WEEK_HIGH -> true;
+            case TOP_LOSERS, NEW_52_WEEK_LOW -> false;
+            case MOST_ACTIVE_EQUITIES, PRICE_BAND_HITTERS, VOLUME_GAINERS, INTRADAY_OPPORTUNITY ->
+                    value.percentChange().signum() >= 0;
+        };
     }
 
     private static BigDecimal percentile(long value, List<Long> values) {

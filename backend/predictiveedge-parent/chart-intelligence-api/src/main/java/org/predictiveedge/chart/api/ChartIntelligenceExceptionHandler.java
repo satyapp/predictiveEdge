@@ -3,6 +3,7 @@ package org.predictiveedge.chart.api;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -24,5 +25,13 @@ public class ChartIntelligenceExceptionHandler {
     ResponseEntity<Map<String, Object>> invalidRequest(IllegalArgumentException failure) {
         return ResponseEntity.badRequest().body(Map.of(
                 "code", "CHART_INTELLIGENCE_INVALID_REQUEST", "message", failure.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<Map<String, Object>> dependencyUnavailable(IllegalStateException failure) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "code", "CHART_INTELLIGENCE_DEPENDENCY_UNAVAILABLE",
+                "message", failure.getMessage() == null
+                        ? "Market-data analysis is temporarily unavailable." : failure.getMessage()));
     }
 }

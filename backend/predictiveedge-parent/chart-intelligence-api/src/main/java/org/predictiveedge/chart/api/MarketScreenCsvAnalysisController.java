@@ -14,6 +14,7 @@ import org.predictiveedge.chart.application.MarketScreenCsvAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
+import org.predictiveedge.chart.application.StageOneGoldenCopy;
 import org.predictiveedge.chart.domain.MarketScreenType;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -88,7 +89,9 @@ public class MarketScreenCsvAnalysisController {
             var deterministic = historical.analyze(new MarketScreenHistoricalAnalysisService.Command(
                     identity.user().id(), brokerAccountId, screenType, csv, tradingDate, observedAt,
                     analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
-            var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, ollama.analyze(deterministic));
+            var stageOne = ollama.analyze(deterministic);
+            var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),
+                    stageOne.goldenCopy());
             history.record(identity.user().id(), screenType.name(), "MARKET_SCREEN_FULL", file.getOriginalFilename(),
                     csv, tradingDate, result.ollama().candidates().size(), result.ollama().model(), result);
             return result;
@@ -98,5 +101,5 @@ public class MarketScreenCsvAnalysisController {
     }
 
     public record OllamaResponse(String authority, MarketScreenHistoricalAnalysisService.Result deterministic,
-            PreOpenOllamaAnalysis ollama) { }
+            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy) { }
 }

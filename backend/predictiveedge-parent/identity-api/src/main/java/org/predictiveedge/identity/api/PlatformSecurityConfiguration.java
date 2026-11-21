@@ -22,9 +22,11 @@ public class PlatformSecurityConfiguration {
                                 "/api/identity/v1/auth/verify-mobile",
                                 "/api/identity/v1/auth/verification/otp/resend",
                                 "/api/identity/v1/auth/login",
-                                "/api/broker/v1/zerodha/callback").permitAll()
+                                "/api/broker/v1/zerodha/callback",
+                                "/api/fyers/v1/callback").permitAll()
                         .requestMatchers("/api/identity/v1/me", "/api/identity/v1/auth/logout").authenticated()
                         .requestMatchers("/api/broker/v1/**").authenticated()
+                        .requestMatchers("/api/fyers/v1/**").authenticated()
                         .requestMatchers("/api/market-intelligence/v1/**").authenticated()
                         .requestMatchers("/api/chart-intelligence/v1/**").authenticated()
                         .requestMatchers("/api/decision/v1/**").authenticated()
