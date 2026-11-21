@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AuthSession } from './auth';
 import { BrokerOverview } from './broker';
 import { beginFyersConnection, disconnectFyersConnection, FyersConnectionStatus, loadFyersConnection } from './fyers';
-import { MarketScreenDecisionCard } from './PreOpenDecisionCard';
+import { AutomateDraft, MarketScreenDecisionCard } from './PreOpenDecisionCard';
+import { sendStageOne } from './fyersAutomate';
 import {
   analyzeIntradayOpportunity, LiveMarketScreenAnalysisResponse, LiveMarketScreenCapability, loadLiveMarketScreenCapabilities,
 } from './marketScreens';
@@ -28,12 +29,13 @@ const categories: ScreenerCategory[] = [
 
 type Candidate = LiveMarketScreenAnalysisResponse['deterministic']['ranking']['candidates'][number];
 
-export function IntradayOpportunityEngine({ session, broker, connectionBusy, onConnectZerodha, onDisconnectZerodha }: {
+export function IntradayOpportunityEngine({ session, broker, connectionBusy, onConnectZerodha, onDisconnectZerodha, onOpenAutomateReview }: {
   session: AuthSession;
   broker?: BrokerOverview;
   connectionBusy: boolean;
   onConnectZerodha: () => void;
   onDisconnectZerodha: () => void;
+  onOpenAutomateReview?: (reviewId: string) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState(categories[0].id);
   const [timeframe, setTimeframe] = useState('5');
@@ -57,6 +59,19 @@ export function IntradayOpportunityEngine({ session, broker, connectionBusy, onC
   const facts = useMemo(() => new Map(result?.deterministic.analyses.map((value) => [value.assessment.symbol, value])), [result]);
   const rankings = useMemo(() => new Map(result?.deterministic.ranking.candidates.map((value) => [value.symbol, value])), [result]);
   const aiCandidates = useMemo(() => new Map(result?.ollama.candidates.map((value) => [value.symbol, value])), [result]);
+  const [automateBusy, setAutomateBusy] = useState(false);
+
+  async function sendToAutomate(symbol: string, draft: AutomateDraft) {
+    setAutomateBusy(true); setNotice(`Sending ${symbol} to FYERS Automate for FIA review…`);
+    try {
+      const sent = await sendStageOne(session.accessToken, symbol, `intraday:${selectedCategory}:${timeframe}m`, draft);
+      setNotice(!sent.webhook ? `${symbol} saved for FIA review. Add a FYERS Automate webhook to send it.`
+        : sent.delivered ? `${symbol} sent to FYERS Automate (${sent.webhook.label}). Review it with FIA, then record FIA's answer in the FYERS Automate tab. No order was placed.`
+        : `${symbol} saved, but FYERS Automate did not accept it: ${sent.error}`);
+      onOpenAutomateReview?.(sent.review.reviewId);
+    } catch (failure) { setNotice(failure instanceof Error ? failure.message : `${symbol} could not be sent to FYERS Automate.`); }
+    finally { setAutomateBusy(false); }
+  }
 
   useEffect(() => {
     void Promise.all([loadLiveMarketScreenCapabilities(session.accessToken)
@@ -144,7 +159,7 @@ export function IntradayOpportunityEngine({ session, broker, connectionBusy, onC
       {categoryCandidates.length === 0 ? <div className="screener-empty"><i>{category.icon}</i><div><b>No qualified {category.label.toLowerCase()} stocks</b><p>Choose the setup and scan controls above, connect FYERS, then select Get qualified stocks.</p></div></div> : <div className="qualified-list">{categoryCandidates.map((candidate) => {
         const selected = selectedSymbols.includes(candidate.symbol);
         const ai = aiCandidates.get(candidate.symbol);
-        return <article key={candidate.symbol} className={selected ? 'selected' : ''}><div className="qualified-summary"><span>#{candidate.rank}</span><div><h4>{candidate.symbol}</h4><small>₹{Number(candidate.lastPrice).toLocaleString('en-IN')} · {candidate.percentChange.toFixed(2)}%</small></div><strong>{candidate.score.toFixed(1)}</strong><em className={candidate.stance === 'LONG_WATCH' ? 'long' : 'short'}>{candidate.stance === 'LONG_WATCH' ? 'LONG' : 'SHORT'}</em><button type="button" onClick={() => setExpandedSymbol(expandedSymbol === candidate.symbol ? undefined : candidate.symbol)}>{expandedSymbol === candidate.symbol ? 'Hide analysis' : 'View level 1 AI'}</button><button type="button" className="promote" disabled={busy} onClick={() => void toggleConsolidated(candidate.symbol)}>{selected ? 'Remove from consolidated' : 'Add to consolidated'}</button></div>{expandedSymbol === candidate.symbol && ai && <MarketScreenDecisionCard candidate={ai} facts={facts.get(candidate.symbol)} ranking={rankings.get(candidate.symbol)} screenType={result!.deterministic.screenType} capital={100000} riskPercent={0.5} />}</article>;
+        return <article key={candidate.symbol} className={selected ? 'selected' : ''}><div className="qualified-summary"><span>#{candidate.rank}</span><div><h4>{candidate.symbol}</h4><small>₹{Number(candidate.lastPrice).toLocaleString('en-IN')} · {candidate.percentChange.toFixed(2)}%</small></div><strong>{candidate.score.toFixed(1)}</strong><em className={candidate.stance === 'LONG_WATCH' ? 'long' : 'short'}>{candidate.stance === 'LONG_WATCH' ? 'LONG' : 'SHORT'}</em><button type="button" onClick={() => setExpandedSymbol(expandedSymbol === candidate.symbol ? undefined : candidate.symbol)}>{expandedSymbol === candidate.symbol ? 'Hide analysis' : 'View level 1 AI'}</button><button type="button" className="promote" disabled={busy} onClick={() => void toggleConsolidated(candidate.symbol)}>{selected ? 'Remove from consolidated' : 'Add to consolidated'}</button></div>{expandedSymbol === candidate.symbol && ai && <MarketScreenDecisionCard candidate={ai} facts={facts.get(candidate.symbol)} ranking={rankings.get(candidate.symbol)} screenType={result!.deterministic.screenType} capital={100000} riskPercent={0.5} automateBusy={automateBusy} onSendToAutomate={(draft) => void sendToAutomate(candidate.symbol, draft)} />}</article>;
       })}</div>}
     </section>
 
@@ -155,7 +170,7 @@ export function IntradayOpportunityEngine({ session, broker, connectionBusy, onC
         const ai = run?.ollama.candidates.find((value) => value.symbol === candidate.symbol);
         const fact = run?.deterministic.analyses.find((value) => value.assessment.symbol === candidate.symbol);
         const ranking = run?.deterministic.ranking.candidates.find((value) => value.symbol === candidate.symbol);
-        return <article key={candidate.symbol}><div><b>{candidate.symbol}</b><span>{category.label}</span></div><strong>{candidate.score.toFixed(1)}</strong><ul><li className="complete">Level 1 AI · final decision active</li><li>Level 2 AI · not enabled</li><li className="complete">Backend intelligence · completed and persisted</li></ul><button type="button" onClick={() => setExpandedSymbol(expandedSymbol === candidate.symbol ? undefined : candidate.symbol)}>{expandedSymbol === candidate.symbol ? 'Hide consolidated analysis' : 'Open consolidated analysis'}</button>{expandedSymbol === candidate.symbol && ai && run && <MarketScreenDecisionCard candidate={ai} facts={fact} ranking={ranking} screenType={run.deterministic.screenType} capital={100000} riskPercent={0.5} />}</article>;
+        return <article key={candidate.symbol}><div><b>{candidate.symbol}</b><span>{category.label}</span></div><strong>{candidate.score.toFixed(1)}</strong><ul><li className="complete">Level 1 AI · final decision active</li><li>Level 2 AI · not enabled</li><li className="complete">Backend intelligence · completed and persisted</li></ul><button type="button" onClick={() => setExpandedSymbol(expandedSymbol === candidate.symbol ? undefined : candidate.symbol)}>{expandedSymbol === candidate.symbol ? 'Hide consolidated analysis' : 'Open consolidated analysis'}</button>{expandedSymbol === candidate.symbol && ai && run && <MarketScreenDecisionCard candidate={ai} facts={fact} ranking={ranking} screenType={run.deterministic.screenType} capital={100000} riskPercent={0.5} automateBusy={automateBusy} onSendToAutomate={(draft) => void sendToAutomate(candidate.symbol, draft)} />}</article>;
       })}</div>}
       <p className="level-rule">Until level-two AI is enabled, the refreshed level-one AI agent remains the final authority for each consolidated intraday stock.</p>
     </section>

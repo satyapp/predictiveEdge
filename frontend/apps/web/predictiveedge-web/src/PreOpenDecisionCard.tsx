@@ -1,6 +1,9 @@
 import { HistoricalSetupAnalysis, OllamaCandidate, RankedPreOpenCandidate } from './preopen';
 import { MarketScreenAnalysisResponse, MarketScreenType } from './marketScreens';
 import { TrendlyneStockAnalysis } from './TrendlyneStockAnalysis';
+import { RecommendationDraft } from './fyersAutomate';
+
+export type AutomateDraft = RecommendationDraft;
 
 type Props = {
   candidate: OllamaCandidate;
@@ -119,13 +122,15 @@ type ScreenCandidate = MarketScreenAnalysisResponse['ollama']['candidates'][numb
 type ScreenFacts = MarketScreenAnalysisResponse['deterministic']['analyses'][number];
 type ScreenRanking = MarketScreenAnalysisResponse['deterministic']['ranking']['candidates'][number];
 
-export function MarketScreenDecisionCard({ candidate, facts, ranking, screenType, capital, riskPercent }: {
+export function MarketScreenDecisionCard({ candidate, facts, ranking, screenType, capital, riskPercent, onSendToAutomate, automateBusy }: {
   candidate: ScreenCandidate;
   facts?: ScreenFacts;
   ranking?: ScreenRanking;
   screenType: MarketScreenType;
   capital: number;
   riskPercent: number;
+  onSendToAutomate?: (draft: AutomateDraft) => void;
+  automateBusy?: boolean;
 }) {
   const assessment = facts?.assessment;
   const isLong = assessment?.action === 'BUY_CANDIDATE' && candidate.stance === 'LONG_WATCH';
@@ -201,6 +206,13 @@ export function MarketScreenDecisionCard({ candidate, facts, ranking, screenType
       {directional && <li>Respect the indicative stop after entry; the targets represent approximately 1R and 2R from the reference level.</li>}
       <li>Close or independently re-underwrite before the session ends; this screen does not authorize overnight exposure.</li>
     </ul></div>
+    {onSendToAutomate && directional && entry != null && stop != null && <div className="automate-send">
+      <div><b>Review with FIA</b><p>Send this stage-1 recommendation to your FYERS Automate strategy. No order is placed; you confirm any trade in FYERS.</p></div>
+      <button type="button" disabled={automateBusy} onClick={() => onSendToAutomate({ action: isLong ? 'BUY' : 'SELL', entryLow: entry, entryHigh: entry,
+        stopLoss: stop, targetOne: targetOne ?? null, targetTwo: targetTwo ?? null, quantity: quantity && quantity > 0 ? quantity : null, confidence: null,
+        rationale: [candidate.thesis, candidate.confirmation && `Confirmation: ${candidate.confirmation}`, candidate.risk && `Risk: ${candidate.risk}`].filter(Boolean).join('\n') })}>
+        {automateBusy ? 'Sending…' : 'Send to FYERS Automate'}</button>
+    </div>}
     <p className="score-warning">Screen score is a relative ranking—not a calibrated win probability. This is decision support, not an order or guarantee.</p>
   </article>;
 }

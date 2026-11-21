@@ -3,6 +3,7 @@ import { AuthSession, clearStoredSession, loadStoredSession, login, logout, regi
 import { beginZerodhaConnection, BrokerOverview, disconnectZerodhaConnection, loadBrokerOverview, releaseZerodhaBrowserLease } from './broker';
 import { MarketIntelligenceDashboard } from './MarketIntelligenceDashboard';
 import { IntradayOpportunityEngine } from './IntradayOpportunityEngine';
+import { FyersAutomateReview, TradeHistory } from './FyersAutomateReview';
 import './broker.css';
 import './preopen-diagnostics.css';
 import './intelligence-dashboard.css';
@@ -120,7 +121,9 @@ function Workspace({ session, onSignedOut }: { session: AuthSession; onSignedOut
 
 function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [workspacePage, setWorkspacePage] = useState<'MANUAL' | 'INTRADAY'>('MANUAL');
+  const initialReview = new URLSearchParams(window.location.search).get('automateReview') ?? undefined;
+  const [workspacePage, setWorkspacePage] = useState<'MANUAL' | 'INTRADAY' | 'AUTOMATE' | 'HISTORY'>(initialReview ? 'AUTOMATE' : 'MANUAL');
+  const [focusReviewId, setFocusReviewId] = useState<string | undefined>(initialReview);
   const [broker, setBroker] = useState<BrokerOverview>();
   const [brokerError, setBrokerError] = useState('');
 
@@ -170,11 +173,14 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
     } finally { setBusy(false); }
   }
 
-  return <main className="workspace"><header><Brand /><nav className="workspace-nav"><button type="button" className={workspacePage === 'MANUAL' ? 'active' : ''} onClick={() => setWorkspacePage('MANUAL')}>Market Intelligence</button><button type="button" className={workspacePage === 'INTRADAY' ? 'active' : ''} onClick={() => setWorkspacePage('INTRADAY')}>Intraday Screener</button></nav><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
+  return <main className="workspace"><header><Brand /><nav className="workspace-nav"><button type="button" className={workspacePage === 'MANUAL' ? 'active' : ''} onClick={() => setWorkspacePage('MANUAL')}>Market Intelligence</button><button type="button" className={workspacePage === 'INTRADAY' ? 'active' : ''} onClick={() => setWorkspacePage('INTRADAY')}>Intraday Screener</button><button type="button" className={workspacePage === 'AUTOMATE' ? 'active' : ''} onClick={() => setWorkspacePage('AUTOMATE')}>FYERS Automate</button><button type="button" className={workspacePage === 'HISTORY' ? 'active' : ''} onClick={() => setWorkspacePage('HISTORY')}>Trade history</button></nav><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
     <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>
     {workspacePage === 'MANUAL' && <MarketIntelligenceDashboard session={session} broker={broker} />}
     {workspacePage === 'INTRADAY' && <IntradayOpportunityEngine session={session} broker={broker}
-      connectionBusy={busy} onConnectZerodha={connectZerodha} onDisconnectZerodha={disconnectZerodha} />}
+      connectionBusy={busy} onConnectZerodha={connectZerodha} onDisconnectZerodha={disconnectZerodha}
+      onOpenAutomateReview={(reviewId) => { setFocusReviewId(reviewId); setWorkspacePage('AUTOMATE'); }} />}
+    {workspacePage === 'AUTOMATE' && <FyersAutomateReview session={session} focusReviewId={focusReviewId} />}
+    {workspacePage === 'HISTORY' && <TradeHistory session={session} />}
     {brokerError && <p className="error" role="alert">{brokerError}</p>}
     <div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
     <div className="identity-summary"><span><small>VERIFIED EMAIL</small>{session.user.email}</span><span><small>VERIFIED MOBILE</small>{session.user.mobileNumber}</span></div>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.predictiveedge</groupId><artifactId>predictiveedge-platform-core</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../predictiveedge-platform-core</relativePath></parent>
+  <artifactId>fyers-automate-review</artifactId>
+  <name>PredictiveEdge FYERS Automate Review Loop</name>
+  <description>Review-only bridge: sends recommendations to FYERS Automate webhooks, records the trader's FIA review, and reconciles both into a final recommendation. It never places broker orders.</description>
+  <dependencies>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-connection-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>trading-decision-infrastructure</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+  </dependencies>
+</project>
