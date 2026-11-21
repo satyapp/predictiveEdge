@@ -10,7 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Confirmation-gated technical analysis for NSE top-gainer/top-loser observations. */
+/** Confirmation-gated technical analysis for normalized NSE market-screen observations. */
 public final class MarketScreenTechnicalAnalyzer {
     private static final MathContext MC = MathContext.DECIMAL64;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
@@ -37,7 +37,7 @@ public final class MarketScreenTechnicalAnalyzer {
         BigDecimal lastClose = closes.getLast();
         boolean bullish = lastClose.compareTo(ema20) > 0 && ema20.compareTo(ema50) > 0;
         boolean bearish = lastClose.compareTo(ema20) < 0 && ema20.compareTo(ema50) < 0;
-        boolean gainer = observation.screenType() == MarketScreenType.TOP_GAINERS;
+        boolean gainer = longDirection(observation);
         boolean qualified = gainer ? bullish && between(rsi14, policy.longMinimumRsi(), policy.longMaximumRsi())
                 : bearish && between(rsi14, policy.shortMinimumRsi(), policy.shortMaximumRsi());
         IntradaySetupAction action = qualified
@@ -125,6 +125,14 @@ public final class MarketScreenTechnicalAnalyzer {
 
     private static boolean between(BigDecimal value, BigDecimal low, BigDecimal high) {
         return value.compareTo(low) >= 0 && value.compareTo(high) <= 0;
+    }
+    private static boolean longDirection(MarketScreenObservation value) {
+        return switch (value.screenType()) {
+            case TOP_GAINERS, NEW_52_WEEK_HIGH -> true;
+            case TOP_LOSERS, NEW_52_WEEK_LOW -> false;
+            case MOST_ACTIVE_EQUITIES, PRICE_BAND_HITTERS, VOLUME_GAINERS, INTRADAY_OPPORTUNITY ->
+                    value.percentChange().signum() >= 0;
+        };
     }
     private static BigDecimal price(BigDecimal value) { return value == null ? null : value.setScale(2, HALF_UP); }
     private static BigDecimal value(BigDecimal value) { return value.setScale(4, HALF_UP); }

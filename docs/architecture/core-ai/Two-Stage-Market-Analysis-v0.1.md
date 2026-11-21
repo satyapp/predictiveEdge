@@ -19,6 +19,18 @@ not repeat NSE CSV parsing or fetch Zerodha history.
 6. Persist the Stage-2 output against the same analysis id and input fingerprint.
 7. Display Stage 1, Stage 2 and side-by-side comparison without reprocessing the source.
 
+## Golden-copy contract
+
+The persisted `stage-one-golden-copy-v1` envelope is the only permitted Phase-2 input. It contains
+the deterministic screen, the point-in-time provider evidence grouped by all nine acquisition
+domains, the manifest for all twelve governed intelligence modules, provider availability and
+timestamps, and the complete structured Ollama response. A SHA-256 fingerprint covers both the
+evidence JSON and Stage-1 response. Missing module evidence remains explicitly unavailable or
+partial; it is never fabricated or silently omitted.
+
+`StageOneAnalysisBundle` requires this golden copy, so a future `AdvancedAnalysisPort` adapter
+cannot receive evidence without the Stage-1 analysis. Phase 2 must not call market-data connectors.
+
 ## Safety and provenance
 
 - Stage 2 has no broker or historical-market-data dependency.
@@ -29,7 +41,6 @@ not repeat NSE CSV parsing or fetch Zerodha history.
 
 ## Phase 2 implementation backlog
 
-- Persist analysis headers, frozen Stage-1 envelopes and per-stage results.
 - Add user-scoped history queries with file/category/date filters.
 - Implement the OpenAI adapter behind `AdvancedAnalysisPort` with structured output validation.
 - Add idempotency by analysis id plus source fingerprint and explicit user-trigger audit events.

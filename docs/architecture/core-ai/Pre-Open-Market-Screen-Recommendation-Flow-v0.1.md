@@ -119,5 +119,11 @@ flowchart TB
 
 ## Implementation boundary
 
-The current pre-open and market-screen endpoints already implement deterministic filtering, ranking, historical enrichment and preliminary Ollama interpretation. They currently label that result as non-final. Completing this target flow requires connecting those screeners to all twelve resource producers, the immutable bundle assembler, the final evaluation API, and the optional Stage-2 provider adapters.
+The current pre-open and market-screen endpoints implement deterministic filtering, ranking,
+historical enrichment and preliminary Ollama interpretation. Stage 1 now receives a twelve-module
+evidence manifest and persists that evidence plus the complete Ollama response as one fingerprinted
+golden copy. Module entries remain `PARTIAL` or `UNAVAILABLE` until their governed producers publish
+usable point-in-time evidence; connector success alone is not final-decision readiness. Completing
+the target flow still requires the remaining resource producers, the final evaluation API, and the
+optional Stage-2 provider adapters.
 

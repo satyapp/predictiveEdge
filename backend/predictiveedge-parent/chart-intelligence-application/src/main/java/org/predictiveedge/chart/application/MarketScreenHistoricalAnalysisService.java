@@ -49,6 +49,16 @@ public final class MarketScreenHistoricalAnalysisService {
     public Result analyze(Command command) {
         Objects.requireNonNull(command, "Market-screen command is required");
         var parsed = parsers.parse(command.screenType(), command.csv(), command.observedAt());
+        return analyzeCanonical(new CanonicalCommand(command.userId(), command.brokerAccountId(),
+                new MarketScreenDataCopy(command.screenType(), "NSE_CSV", command.observedAt(), clock.instant(),
+                        "UPLOADED", parsed.observations(), parsed.rejectedRows()), command.tradingDate(),
+                command.analysisCutoff(), command.historyWindow(), command.maximumCandidates()));
+    }
+
+    public Result analyzeCanonical(CanonicalCommand command) {
+        Objects.requireNonNull(command, "Canonical market-screen command is required");
+        MarketScreenDataCopy dataCopy = command.dataCopy();
+        var parsed = new MarketScreenCsvParser.ParseResult(dataCopy.observations(), dataCopy.rejectedRows());
         var ranking = ranker.rank(parsed.observations());
         var bySymbol = parsed.observations().stream().collect(Collectors.toMap(MarketScreenObservation::symbol,
                 Function.identity(), (left, right) -> left, LinkedHashMap::new));
@@ -76,7 +86,7 @@ public final class MarketScreenHistoricalAnalysisService {
                         failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
             }
         });
-        return new Result("PRELIMINARY_NOT_FINAL", command.screenType(), clock.instant(),
+        return new Result("PRELIMINARY_NOT_FINAL", dataCopy.screenType(), clock.instant(),
                 parsed.observations().size(), parsed.rejectedRows(), ranking, List.copyOf(analyses),
                 List.copyOf(failures));
     }
@@ -105,6 +115,22 @@ public final class MarketScreenHistoricalAnalysisService {
             if (brokerAccountId == null || brokerAccountId.isBlank()) throw new IllegalArgumentException("Broker account id is required");
             if (csv == null || csv.isBlank()) throw new IllegalArgumentException("Market-screen CSV is empty");
             if (observedAt.isAfter(analysisCutoff)) throw new IllegalArgumentException("Observation cannot follow cutoff");
+            if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(365)) > 0)
+                throw new IllegalArgumentException("History window must be between 7 and 365 days");
+            if (maximumCandidates < 1 || maximumCandidates > 20)
+                throw new IllegalArgumentException("Maximum candidates must be between 1 and 20");
+        }
+    }
+
+    public record CanonicalCommand(UUID userId, String brokerAccountId, MarketScreenDataCopy dataCopy,
+            LocalDate tradingDate, Instant analysisCutoff, Duration historyWindow, int maximumCandidates) {
+        public CanonicalCommand {
+            Objects.requireNonNull(userId); Objects.requireNonNull(dataCopy); Objects.requireNonNull(tradingDate);
+            Objects.requireNonNull(analysisCutoff); Objects.requireNonNull(historyWindow);
+            if (brokerAccountId == null || brokerAccountId.isBlank())
+                throw new IllegalArgumentException("Broker account id is required");
+            if (dataCopy.observedAt().isAfter(analysisCutoff))
+                throw new IllegalArgumentException("Observation cannot follow cutoff");
             if (historyWindow.compareTo(Duration.ofDays(7)) < 0 || historyWindow.compareTo(Duration.ofDays(365)) > 0)
                 throw new IllegalArgumentException("History window must be between 7 and 365 days");
             if (maximumCandidates < 1 || maximumCandidates > 20)

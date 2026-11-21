@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort;
+import org.predictiveedge.chart.application.StageOneGoldenCopy;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.MediaType;
@@ -83,7 +84,9 @@ public class PreOpenCsvAnalysisController {
             var deterministic = service.analyze(new PreOpenCsvAnalysisService.Command(identity.user().id(),
                     brokerAccountId, csv, tradingDate, observedAt,
                     analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
-            var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, ollama.analyze(deterministic));
+            var stageOne = ollama.analyze(deterministic);
+            var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),
+                    stageOne.goldenCopy());
             history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_FULL", file.getOriginalFilename(), csv,
                     tradingDate, result.ollama().candidates().size(), result.ollama().model(), result);
             return result;
@@ -93,5 +96,5 @@ public class PreOpenCsvAnalysisController {
     }
 
     public record OllamaResponse(String authority, PreOpenCsvAnalysisService.Result deterministic,
-            PreOpenOllamaAnalysis ollama) { }
+            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy) { }
 }

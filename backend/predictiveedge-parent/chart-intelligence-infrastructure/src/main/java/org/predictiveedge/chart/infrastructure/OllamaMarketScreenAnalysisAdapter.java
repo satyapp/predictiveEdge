@@ -19,6 +19,7 @@ import java.util.Objects;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
+import org.predictiveedge.chart.application.StageOneAiResult;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
 
 /** Local-model interpretation of deterministic Top Gainer/Loser historical evidence. */
@@ -28,31 +29,45 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             Never invent news, fundamentals, prices, indicators, probabilities, or events. Preserve every supplied
             action exactly: BUY_CANDIDATE=LONG_WATCH, SELL_CANDIDATE=SHORT_WATCH, WAIT=WAIT,
             INSUFFICIENT_EVIDENCE=INSUFFICIENT_EVIDENCE. Explain thesis, confirmation, and the kill condition.
+            Evaluate Market, Chart, Scanner, Strategy, Risk, Portfolio, Learning, Data Quality, Regime Drift,
+            Execution, Validation and Calibration. Respect provider status; unavailable data is not negative data.
+            Trendlyne technical and fundamental/SWOT evidence is supplementary. Call out conflicts and never use
+            supplementary context to change a deterministic action.
             This is a watchlist assessment, never an executable order or final recommendation.
             """;
     private final ObjectMapper json; private final HttpClient http; private final URI endpoint;
     private final String model; private final Duration timeout; private final int contextTokens;
     private final int outputTokens; private final Clock clock;
+    private final StageOneIntelligenceEvidenceCollector intelligence;
+    private final StageOneGoldenCopyFactory goldenCopies;
 
     public OllamaMarketScreenAnalysisAdapter(ObjectMapper json, HttpClient http, URI endpoint, String model,
-            Duration timeout, int contextTokens, int outputTokens, Clock clock) {
+            Duration timeout, int contextTokens, int outputTokens, Clock clock,
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
         this.json = Objects.requireNonNull(json); this.http = Objects.requireNonNull(http);
         this.endpoint = Objects.requireNonNull(endpoint); this.model = required(model, "Model");
         this.timeout = Objects.requireNonNull(timeout); this.contextTokens = contextTokens;
         this.outputTokens = outputTokens; this.clock = Objects.requireNonNull(clock);
+        this.intelligence = Objects.requireNonNull(intelligence);
+        this.goldenCopies = Objects.requireNonNull(goldenCopies);
     }
 
     @Override
-    public PreOpenOllamaAnalysis analyze(MarketScreenHistoricalAnalysisService.Result result) {
+    public StageOneAiResult analyze(MarketScreenHistoricalAnalysisService.Result result) {
+        String evidenceJson = write(compact(result));
         Map<String, String> expected = new LinkedHashMap<>();
         result.analyses().forEach(value -> expected.put(value.assessment().symbol(), stance(value.assessment().action())));
-        if (expected.isEmpty()) return new PreOpenOllamaAnalysis(model, clock.instant(), false, "NO_SETUP",
-                "No stock completed Zerodha historical analysis, so Ollama was not invoked.", List.of(),
-                List.of("Resolve the per-stock historical failures before relying on this screen."));
+        if (expected.isEmpty()) {
+            var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), false, "NO_SETUP",
+                    "No stock completed Zerodha historical analysis, so Ollama was not invoked.", List.of(),
+                    List.of("Resolve the per-stock historical failures before relying on this screen."));
+            return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
+        }
         ObjectNode request = json.createObjectNode(); request.put("model", model).put("stream", false).put("think", false);
         ArrayNode messages = request.putArray("messages");
         messages.addObject().put("role", "system").put("content", SYSTEM);
-        messages.addObject().put("role", "user").put("content", "Interpret this frozen evidence JSON:\n" + write(compact(result)));
+        messages.addObject().put("role", "user").put("content",
+                "Evaluate all twelve intelligence modules in this frozen evidence JSON:\n" + evidenceJson);
         request.set("format", schema()); request.putObject("options").put("temperature", 0)
                 .put("num_ctx", contextTokens).put("num_predict", outputTokens);
         try {
@@ -74,8 +89,9 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             }
             if (!returned.equals(expected)) throw new IllegalStateException("Ollama changed deterministic symbols or directions");
             var cautions = new ArrayList<String>(); content.path("cautions").forEach(value -> cautions.add(value.asText()));
-            return new PreOpenOllamaAnalysis(model, clock.instant(), true, content.path("market_tone").asText(),
-                    content.path("overview").asText(), candidates, cautions);
+            var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
+                    content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
+            return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt(); throw new IllegalStateException("Ollama analysis was interrupted", failure);
         } catch (IOException failure) { throw new IllegalStateException("Ollama analysis is unavailable", failure); }
@@ -95,6 +111,8 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             node.put("confirmation_rule", assessment.confirmationRule());
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
+        root.set("intelligence_evidence", intelligence.collect(
+                result.analyses().stream().map(value -> value.assessment().symbol()).toList(), result.analyzedAt()));
         return root;
     }
 

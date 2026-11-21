@@ -11,6 +11,8 @@ import org.predictiveedge.chart.application.NsePreOpenCsvParser;
 import org.predictiveedge.chart.application.NseTopMoversCsvParser;
 import org.predictiveedge.chart.application.MarketScreenCsvAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
+import org.predictiveedge.chart.application.LiveMarketScreenAnalysisService;
+import org.predictiveedge.chart.application.LiveMarketScreenSource;
 import org.predictiveedge.chart.application.MarketScreenCsvParser;
 import org.predictiveedge.chart.application.MarketScreenCsvParserRegistry;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
@@ -23,13 +25,26 @@ import org.predictiveedge.chart.domain.PreOpenIntradayAnalyzer;
 import org.predictiveedge.marketintelligence.application.MarketBarQueryPort;
 import org.predictiveedge.marketintelligence.application.PreOpenAuctionQueryPort;
 import org.predictiveedge.marketintelligence.application.PreOpenAuctionPublicationPort;
+import org.predictiveedge.intelligence.connector.IntelligenceDataConnector;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration(proxyBeanMethods = false)
 public class ChartIntelligenceInfrastructureConfiguration {
+    @Bean
+    StageOneIntelligenceEvidenceCollector stageOneIntelligenceEvidenceCollector(
+            IntelligenceDataConnector connector, ObjectMapper json) {
+        return new StageOneIntelligenceEvidenceCollector(connector, json);
+    }
+
+    @Bean
+    StageOneGoldenCopyFactory stageOneGoldenCopyFactory(ObjectMapper json) {
+        return new StageOneGoldenCopyFactory(json, Clock.systemUTC());
+    }
+
     @Bean
     org.predictiveedge.chart.application.AnalysisRunHistoryStore analysisRunHistoryStore(JdbcTemplate jdbc) {
         return new JdbcAnalysisRunHistoryStore(jdbc);
@@ -97,6 +112,13 @@ public class ChartIntelligenceInfrastructureConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(LiveMarketScreenSource.class)
+    LiveMarketScreenAnalysisService liveMarketScreenAnalysisService(
+            LiveMarketScreenSource source, MarketScreenHistoricalAnalysisService downstream) {
+        return new LiveMarketScreenAnalysisService(source, downstream);
+    }
+
+    @Bean
     PreOpenCsvAnalysisService preOpenCsvAnalysisService(
             NsePreOpenCsvParser parser,
             LiveMarketDataInstrumentResolver instruments,
@@ -123,11 +145,12 @@ public class ChartIntelligenceInfrastructureConfiguration {
             @Value("${predictiveedge.ai.ollama.endpoint:http://localhost:11434/api/chat}") URI endpoint,
             @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
             @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
-            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens) {
+            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         return new OllamaPreOpenAnalysisAdapter(json,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), endpoint, model,
-                timeout, contextTokens, outputTokens, Clock.systemUTC());
+                timeout, contextTokens, outputTokens, Clock.systemUTC(), intelligence, goldenCopies);
     }
 
     @Bean
@@ -137,10 +160,11 @@ public class ChartIntelligenceInfrastructureConfiguration {
             @Value("${predictiveedge.ai.ollama.endpoint:http://localhost:11434/api/chat}") URI endpoint,
             @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
             @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
-            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens) {
+            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         return new OllamaMarketScreenAnalysisAdapter(json,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), endpoint, model,
-                timeout, contextTokens, outputTokens, Clock.systemUTC());
+                timeout, contextTokens, outputTokens, Clock.systemUTC(), intelligence, goldenCopies);
     }
 }

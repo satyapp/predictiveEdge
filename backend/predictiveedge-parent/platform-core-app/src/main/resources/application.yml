@@ -40,6 +40,12 @@ spring:
   flyway:
     enabled: true
 predictiveedge:
+  fyers:
+    enabled: ${PE_FYERS_ENABLED:false}
+    app-id: ${PE_FYERS_APP_ID:}
+    secret-id: ${PE_FYERS_SECRET_ID:}
+    redirect-uri: ${PE_FYERS_REDIRECT_URI:http://localhost:3000/api/fyers/v1/callback}
+    timeout-seconds: ${PE_FYERS_TIMEOUT_SECONDS:30}
   eventing:
     dispatch:
       enabled: ${PE_EVENTING_DISPATCH_ENABLED:false}

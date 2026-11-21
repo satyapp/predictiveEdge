@@ -1,7 +1,5 @@
 package org.predictiveedge.chart.application;
 
-import java.time.Instant;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -14,28 +12,19 @@ import java.util.UUID;
 public record StageOneAnalysisBundle(
         UUID analysisId,
         UUID userId,
-        String category,
-        String sourceFingerprint,
-        Instant frozenAt,
-        String modelId,
-        Instant generatedAt,
-        String evidenceJson) {
+        StageOneGoldenCopy goldenCopy) {
 
     public StageOneAnalysisBundle {
         Objects.requireNonNull(analysisId, "Analysis id is required");
         Objects.requireNonNull(userId, "User id is required");
-        category = required(category, "Category").toUpperCase(Locale.ROOT);
-        sourceFingerprint = required(sourceFingerprint, "Source fingerprint");
-        Objects.requireNonNull(frozenAt, "Frozen-at time is required");
-        modelId = required(modelId, "Stage-1 model id");
-        Objects.requireNonNull(generatedAt, "Stage-1 generated-at time is required");
-        evidenceJson = required(evidenceJson, "Evidence JSON");
-        if (generatedAt.isAfter(frozenAt))
-            throw new IllegalArgumentException("Stage-1 generation cannot follow evidence freeze time");
+        Objects.requireNonNull(goldenCopy, "Stage-1 golden copy is required");
     }
 
-    private static String required(String value, String label) {
-        if (value == null || value.isBlank()) throw new IllegalArgumentException(label + " is required");
-        return value.trim();
-    }
+    public String category() { return goldenCopy.category(); }
+    public String sourceFingerprint() { return goldenCopy.sourceFingerprint(); }
+    public java.time.Instant frozenAt() { return goldenCopy.frozenAt(); }
+    public String modelId() { return goldenCopy.stageOneAnalysis().model(); }
+    public java.time.Instant generatedAt() { return goldenCopy.stageOneAnalysis().generatedAt(); }
+    public String evidenceJson() { return goldenCopy.intelligenceEvidenceJson(); }
+    public PreOpenOllamaAnalysis stageOneAnalysis() { return goldenCopy.stageOneAnalysis(); }
 }

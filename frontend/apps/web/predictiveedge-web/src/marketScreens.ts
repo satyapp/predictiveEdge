@@ -1,3 +1,5 @@
+import type { OllamaAnalysis, StageOneGoldenCopy } from './preopen';
+
 export type MarketScreenType =
   | 'TOP_GAINERS'
   | 'TOP_LOSERS'
@@ -5,7 +7,8 @@ export type MarketScreenType =
   | 'NEW_52_WEEK_LOW'
   | 'MOST_ACTIVE_EQUITIES'
   | 'PRICE_BAND_HITTERS'
-  | 'VOLUME_GAINERS';
+  | 'VOLUME_GAINERS'
+  | 'INTRADAY_OPPORTUNITY';
 
 export type MarketScreenAnalysisResponse = {
   authority: 'PRELIMINARY_NOT_FINAL';
@@ -47,11 +50,26 @@ export type MarketScreenAnalysisResponse = {
     }[];
     failures: { venue: string; symbol: string; reason: string }[];
   };
-  ollama: {
-    model: string; generatedAt: string; invoked: boolean;
-    marketTone: 'BULLISH' | 'BEARISH' | 'MIXED' | 'NO_SETUP'; overview: string;
-    candidates: { symbol: string; stance: 'LONG_WATCH' | 'SHORT_WATCH' | 'WAIT' | 'NO_TRADE' | 'INSUFFICIENT_EVIDENCE'; thesis: string; confirmation: string; risk: string }[];
-    cautions: string[];
+  ollama: OllamaAnalysis;
+  goldenCopy: StageOneGoldenCopy;
+};
+
+export type LiveMarketScreenCapability = {
+  screenType: MarketScreenType;
+  available: boolean;
+  sourceTool: string;
+  detail: string;
+};
+
+export type LiveMarketScreenAnalysisResponse = MarketScreenAnalysisResponse & {
+  dataCopy: {
+    screenType: MarketScreenType;
+    source: string;
+    observedAt: string;
+    fetchedAt: string;
+    freshness: 'LIVE' | 'DELAYED' | 'STALE' | 'UNKNOWN';
+    observations: { symbol: string; lastPrice: number; percentChange: number; volume: number; turnover: number }[];
+    rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   };
 };
 
@@ -83,4 +101,64 @@ export async function analyzeMarketScreenCsv(input: {
       ?? payload.message ?? `Market-screen CSV could not be analyzed (HTTP ${response.status}).`);
   }
   return response.json() as Promise<MarketScreenAnalysisResponse>;
+}
+
+export async function loadLiveMarketScreenCapabilities(accessToken: string) {
+  const response = await fetch('/api/chart-intelligence/v1/live-stock-discovery/capabilities', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Your PredictiveEdge session has expired. Sign out and sign in again.');
+    if (response.status === 404) return [] as LiveMarketScreenCapability[];
+    throw new Error(`Live NSE MCP capabilities are unavailable (HTTP ${response.status}).`);
+  }
+  return response.json() as Promise<LiveMarketScreenCapability[]>;
+}
+
+export async function analyzeLiveMarketScreen(input: {
+  accessToken: string;
+  brokerAccountId: string;
+  screenType: MarketScreenType;
+  tradingDate: string;
+  maximumCandidates?: number;
+  setup?: string;
+  universe?: string;
+  timeframe?: string;
+  selectedSymbol?: string;
+}) {
+  const response = await fetch('/api/chart-intelligence/v1/live-stock-discovery/ollama', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      brokerAccountId: input.brokerAccountId,
+      screenType: input.screenType,
+      tradingDate: input.tradingDate,
+      historyDays: 365,
+      maximumCandidates: input.maximumCandidates ?? 10,
+      setup: input.setup ?? '',
+      universe: input.universe ?? '',
+      timeframe: input.timeframe ?? '',
+      selectedSymbol: input.selectedSymbol ?? '',
+    }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Your PredictiveEdge session has expired. Sign out and sign in again.');
+    const payload = await response.json().catch(() => ({})) as { message?: string; fieldErrors?: { message?: string }[] };
+    throw new Error(payload.fieldErrors?.find((value) => value.message)?.message
+      ?? payload.message ?? `Live market screen could not be analyzed (HTTP ${response.status}).`);
+  }
+  return response.json() as Promise<LiveMarketScreenAnalysisResponse>;
+}
+
+export async function analyzeIntradayOpportunity(input: {
+  accessToken: string;
+  brokerAccountId: string;
+  tradingDate: string;
+  maximumCandidates?: number;
+  setup?: string;
+  universe?: string;
+  timeframe?: string;
+  selectedSymbol?: string;
+}) {
+  return analyzeLiveMarketScreen({ ...input, screenType: 'INTRADAY_OPPORTUNITY' });
 }
