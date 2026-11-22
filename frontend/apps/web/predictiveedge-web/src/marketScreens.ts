@@ -68,7 +68,8 @@ export type LiveMarketScreenAnalysisResponse = MarketScreenAnalysisResponse & {
     observedAt: string;
     fetchedAt: string;
     freshness: 'LIVE' | 'DELAYED' | 'STALE' | 'UNKNOWN';
-    observations: { symbol: string; lastPrice: number; percentChange: number; volume: number; turnover: number }[];
+    observations: { symbol: string; sourceRank: number; open: number; high: number; low: number;
+      previousClose: number; lastPrice: number; percentChange: number; volume: number; turnover: number; observedAt: string }[];
     rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   };
 };
