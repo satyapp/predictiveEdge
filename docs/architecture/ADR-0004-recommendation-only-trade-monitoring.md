@@ -1,6 +1,7 @@
 # ADR-0004: Recommendation-Only Trading and Human-Executed Orders
 
 - Status: Accepted
+- Amended by: ADR-0006 (proposed) allows user-confirmed FYERS cash-equity orders
 - Date: 2026-07-31
 - Supersedes: The paper-before-live execution sequence in ADR-0002
 

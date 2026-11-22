@@ -13,6 +13,10 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId></dependency>
     <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    <!-- Official FYERS API v3 Java SDK 2.2.0 (fat jar), see third-party/README.md. -->
+    <dependency><groupId>in.fyers</groupId><artifactId>fyers-java-sdk</artifactId><version>2.2.0</version></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope>
+      <!-- android-json also defines org.json.JSONObject and would shadow the copy the FYERS SDK needs. -->
+      <exclusions><exclusion><groupId>com.vaadin.external.google</groupId><artifactId>android-json</artifactId></exclusion></exclusions></dependency>
   </dependencies>
 </project>

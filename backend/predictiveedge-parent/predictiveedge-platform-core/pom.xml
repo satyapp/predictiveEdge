@@ -18,6 +18,11 @@
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
+  <repositories>
+    <!-- FYERS publishes its Java SDK only as a jar in GitHub, so it is kept in this repo-local Maven repository. -->
+    <repository><id>predictiveedge-third-party</id><url>file:${project.basedir}/../third-party/maven-repo</url>
+      <releases><checksumPolicy>fail</checksumPolicy></releases><snapshots><enabled>false</enabled></snapshots></repository>
+  </repositories>
   <modules>
     <module>../platform-eventing-contracts</module>
     <module>../platform-eventing-application</module>

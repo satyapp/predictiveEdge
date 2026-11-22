@@ -46,6 +46,13 @@ predictiveedge:
     secret-id: ${PE_FYERS_SECRET_ID:}
     redirect-uri: ${PE_FYERS_REDIRECT_URI:http://localhost:3000/api/fyers/v1/callback}
     timeout-seconds: ${PE_FYERS_TIMEOUT_SECONDS:30}
+    sdk:
+      lock-timeout-seconds: ${PE_FYERS_SDK_LOCK_TIMEOUT_SECONDS:20}
+    orders:
+      # Live order placement through the FYERS Java SDK (ADR-0006). Off unless explicitly turned on.
+      enabled: ${PE_FYERS_ORDERS_ENABLED:false}
+      maximum-quantity: ${PE_FYERS_ORDERS_MAXIMUM_QUANTITY:100}
+      maximum-order-value: ${PE_FYERS_ORDERS_MAXIMUM_ORDER_VALUE:100000}
   fyers-automate:
     # Review-only bridge to FYERS Automate webhooks (ADR-0005). It never places broker orders.
     enabled: ${PE_FYERS_AUTOMATE_ENABLED:true}

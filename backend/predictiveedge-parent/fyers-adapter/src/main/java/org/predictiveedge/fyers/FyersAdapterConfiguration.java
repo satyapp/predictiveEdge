@@ -36,6 +36,16 @@ public class FyersAdapterConfiguration {
                 new FyersConnectionService.Settings(enabled, appId, secretId, redirectUri, webBaseUrl),
                 Clock.systemUTC(), new SecureRandom());
     }
+    @Bean FyersSdkGateway fyersSdkGateway(FyersConnectionService connections, ObjectMapper json,
+            @Value("${predictiveedge.fyers.sdk.lock-timeout-seconds:20}") long lockTimeout) {
+        return new FyersSdkGateway(connections::authorization, com.tts.in.model.FyersClass::getInstance, json, lockTimeout);
+    }
+    @Bean FyersOrderService fyersOrderService(FyersSdkGateway gateway,
+            @Value("${predictiveedge.fyers.orders.enabled:false}") boolean enabled,
+            @Value("${predictiveedge.fyers.orders.maximum-quantity:100}") int maximumQuantity,
+            @Value("${predictiveedge.fyers.orders.maximum-order-value:100000}") java.math.BigDecimal maximumValue) {
+        return new FyersOrderService(gateway, new FyersOrderService.Settings(enabled, maximumQuantity, maximumValue));
+    }
     @Bean @Primary LiveMarketDataInstrumentResolver fyersInstrumentResolver(FyersHttpClient client) {
         return new FyersInstrumentResolver(client, Clock.systemUTC());
     }
