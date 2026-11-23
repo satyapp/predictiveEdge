@@ -21,5 +21,6 @@ async function request<T>(path: string, accessToken: string, init: RequestInit =
 }
 
 export const loadFyersConnection = (accessToken: string) => request<FyersConnectionStatus>('/connection', accessToken);
+export const verifyFyersDataPath = (accessToken: string) => request<{ status: string; profileStatus: string; symbol: string; candleCount: number; latestCandleAt: string; checkedAt: string }>('/verification', accessToken);
 export const beginFyersConnection = (accessToken: string) => request<{ authorizationUrl: string }>('/connect', accessToken, { method: 'POST' });
 export const disconnectFyersConnection = (accessToken: string) => request<void>('/connection', accessToken, { method: 'DELETE' });

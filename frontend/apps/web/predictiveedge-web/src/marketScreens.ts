@@ -62,15 +62,23 @@ export type LiveMarketScreenCapability = {
 };
 
 export type LiveMarketScreenAnalysisResponse = MarketScreenAnalysisResponse & {
-  dataCopy: {
+  dataCopy: LiveMarketScreenDataCopy;
+};
+
+export type LiveMarketScreenDataCopy = {
     screenType: MarketScreenType;
     source: string;
     observedAt: string;
     fetchedAt: string;
     freshness: 'LIVE' | 'DELAYED' | 'STALE' | 'UNKNOWN';
-    observations: { symbol: string; lastPrice: number; percentChange: number; volume: number; turnover: number }[];
+    observations: { symbol: string; sourceRank: number; open: number; high: number; low: number;
+      previousClose: number; lastPrice: number; percentChange: number; volume: number; turnover: number; observedAt: string }[];
     rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
-  };
+};
+
+export type LiveMarketScreenSearchResponse = {
+  authority: 'BROKER_SCREEN_ONLY';
+  dataCopy: LiveMarketScreenDataCopy;
 };
 
 export async function analyzeMarketScreenCsv(input: {
@@ -150,6 +158,41 @@ export async function analyzeLiveMarketScreen(input: {
   return response.json() as Promise<LiveMarketScreenAnalysisResponse>;
 }
 
+export async function searchLiveMarketScreen(input: {
+  accessToken: string;
+  brokerAccountId: string;
+  screenType: MarketScreenType;
+  tradingDate: string;
+  maximumCandidates?: number;
+  setup?: string;
+  universe?: string;
+  timeframe?: string;
+  selectedSymbol?: string;
+}) {
+  const response = await fetch('/api/chart-intelligence/v1/live-stock-discovery/search', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      brokerAccountId: input.brokerAccountId,
+      screenType: input.screenType,
+      tradingDate: input.tradingDate,
+      historyDays: 365,
+      maximumCandidates: input.maximumCandidates ?? 10,
+      setup: input.setup ?? '',
+      universe: input.universe ?? '',
+      timeframe: input.timeframe ?? '',
+      selectedSymbol: input.selectedSymbol ?? '',
+    }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Your PredictiveEdge session has expired. Sign out and sign in again.');
+    const payload = await response.json().catch(() => ({})) as { message?: string; fieldErrors?: { message?: string }[] };
+    throw new Error(payload.fieldErrors?.find((value) => value.message)?.message
+      ?? payload.message ?? `FYERS stock search failed (HTTP ${response.status}).`);
+  }
+  return response.json() as Promise<LiveMarketScreenSearchResponse>;
+}
+
 export async function analyzeIntradayOpportunity(input: {
   accessToken: string;
   brokerAccountId: string;
@@ -161,4 +204,17 @@ export async function analyzeIntradayOpportunity(input: {
   selectedSymbol?: string;
 }) {
   return analyzeLiveMarketScreen({ ...input, screenType: 'INTRADAY_OPPORTUNITY' });
+}
+
+export async function searchIntradayOpportunity(input: {
+  accessToken: string;
+  brokerAccountId: string;
+  tradingDate: string;
+  maximumCandidates?: number;
+  setup?: string;
+  universe?: string;
+  timeframe?: string;
+  selectedSymbol?: string;
+}) {
+  return searchLiveMarketScreen({ ...input, screenType: 'INTRADAY_OPPORTUNITY' });
 }
