@@ -1,0 +1,107 @@
+.automation-workspace{padding:0;background:linear-gradient(135deg,#fafaff,#f1f3ff)}
+.automation-workspace .workspace-content{max-width:1600px;margin:0 auto;padding:0 18px 28px}
+.automation-workspace-page{--purple:#5b35df;--ink:#11143b;--muted:#6b7088;--line:#d8d8ee;margin-top:18px;display:grid;gap:12px;color:var(--ink)}
+/* The global `.workspace header` rule centres and narrows every header; reset it inside this page. */
+.workspace .automation-workspace-page header{max-width:none;margin:0;justify-content:flex-start}
+.automation-workspace-page .positive{color:#0f8a4b}.automation-workspace-page .negative{color:#c2412d}
+
+.aw-title{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.aw-title>div>span{color:var(--purple);font-size:10px;font-weight:900;letter-spacing:.12em}
+.aw-title h1{margin:2px 0 1px;font:800 clamp(24px,3vw,34px) 'Manrope'}
+.aw-title p{margin:0;color:#555b75;font-size:13px}
+.aw-title-badges{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.aw-title-badges em{padding:7px 11px;border-radius:8px;font-size:10px;font-style:normal;font-weight:900;letter-spacing:.04em;white-space:nowrap}
+.aw-demo{color:#9a5a0b;background:#fff1d8;border:1px solid #f1d3a3}
+.aw-source{color:#4b2fc0;background:#efebff;border:1px solid #d9d0ff}
+
+.aw-hint{padding:10px 12px;display:flex;align-items:center;gap:10px;border:1px solid #d9d0ff;border-radius:10px;background:#f8f6ff;font-size:12px}
+.aw-hint>span{color:var(--purple);font-size:16px;font-weight:900}
+.aw-hint p{margin:0;color:#41466a}
+.aw-hint button{margin-left:auto;padding:7px 11px;border:1px solid #c9bdf7;border-radius:7px;color:var(--purple);background:#fff;font-size:11px;font-weight:850;white-space:nowrap}
+
+.aw-card{border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 8px 25px #2f2a6710;overflow:hidden}
+.aw-card>header{min-height:44px;padding:8px 14px;display:flex;align-items:center;gap:9px;background:linear-gradient(90deg,#f9f8ff,#eeecff)}
+.aw-card>header>span{width:24px;color:var(--purple);font-size:18px;font-weight:900;text-align:center}
+.aw-card h2{margin:0;font:800 16px 'Manrope'}
+.aw-card>header select,.aw-select-all{margin-left:auto}
+.aw-card>header select{height:32px;min-width:150px;padding:0 10px;border:1px solid #cfcbe9;border-radius:7px;background:#fff;color:var(--ink);font-size:12px;font-weight:750}
+.aw-select-all{display:flex;align-items:center;gap:7px;color:#41466a;font-size:12px;font-weight:750}
+
+.aw-risk{padding:14px 14px 4px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.aw-risk label,.aw-field{display:grid;gap:6px;color:#363b5e;font-size:12px;font-weight:750}
+.aw-risk input,.aw-field input,.aw-field select,.aw-field textarea{width:100%;min-height:38px;padding:0 11px;border:1px solid #c9c9df;border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-weight:600}
+.aw-field textarea{min-height:120px;padding:10px 11px;resize:vertical;line-height:1.5}
+.aw-field textarea:disabled{background:#f5f5fa;cursor:not-allowed}
+.aw-risk input:focus,.aw-field input:focus,.aw-field select:focus,.aw-field textarea:focus{outline:2px solid #5b35df33;border-color:var(--purple)}
+.aw-help{margin:0;padding:6px 14px 14px;color:var(--muted);font-size:11px}
+.aw-help b{color:#c2412d}
+
+.aw-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.aw-stats article{padding:14px 16px;display:grid;gap:5px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 8px 25px #2f2a670b}
+.aw-stats small{color:#7a7f97;font-size:10px;font-weight:900;letter-spacing:.07em}
+.aw-stats strong{font:800 22px 'Manrope'}
+.aw-warning{margin:0;padding:10px 12px;border:1px solid #f1d3a3;border-radius:9px;color:#8a520b;background:#fff8ea;font-size:12px;font-weight:700}
+
+.aw-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.aw-tabs button{min-height:38px;padding:0 14px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;color:#4a4f70;background:#fff;font-size:12px;font-weight:850}
+.aw-tabs button i{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;color:var(--purple);background:#efebff;font-size:10px;font-style:normal}
+.aw-tabs button.active{border-color:transparent;color:#fff;background:linear-gradient(135deg,#6b42e5,#5b35df);box-shadow:0 7px 20px #6741e433}
+.aw-tabs button.active i{color:var(--purple);background:#fff}
+
+.aw-scroll{overflow-x:auto}
+.aw-table{width:100%;min-width:1080px;border-collapse:collapse}
+.aw-table th{padding:10px 8px;border-bottom:1px solid var(--line);color:#5c6183;background:#fbfbff;font-size:10px;font-weight:900;letter-spacing:.03em;text-align:left;white-space:nowrap}
+.aw-table td{padding:11px 8px;border-bottom:1px solid #ececf6;color:#2b2f52;font-size:12px;vertical-align:middle}
+.aw-table td small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+.aw-table td small.negative{color:#c2412d}
+.aw-table tr.active td{background:#faf8ff}
+.aw-table tr:hover td{background:#f7f5ff}
+.aw-symbol{display:flex;align-items:center;gap:8px}
+.aw-symbol b{font-size:13px}
+.aw-stage{display:inline-block;margin:5px 0 0 22px;padding:3px 7px;border-radius:99px;font-size:9px;font-weight:900;letter-spacing:.03em;white-space:nowrap}
+.aw-stage.idle{color:#626b7e;background:#edf0f5}.aw-stage.progress{color:#9a5a0b;background:#fff1d8}.aw-stage.done{color:#08733f;background:#dcf7e7}
+.aw-rank{display:inline-grid;place-items:center;min-width:28px;height:22px;padding:0 6px;border-radius:6px;color:#4b2fc0;background:#efebff;font-size:11px;font-weight:900}
+.aw-action{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:900;letter-spacing:.05em}
+.aw-action.buy{color:#08733f;background:#dcf7e7}.aw-action.sell{color:#b3261e;background:#ffe4e1}
+.aw-link{padding:0;border:0;color:var(--purple);background:none;font-size:12px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.aw-row-actions,.aw-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.aw-primary,.aw-secondary{min-height:34px;padding:0 13px;border-radius:8px;font-size:12px;font-weight:850;white-space:nowrap}
+.aw-primary{border:0;color:#fff;background:linear-gradient(135deg,#6b42e5,#5b35df);box-shadow:0 6px 16px #5b35df2b}
+.aw-secondary{border:1px solid #cfcbe9;color:#3f2ca7;background:#fff}
+.aw-primary:disabled,.aw-secondary:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+.aw-empty td{height:74px;color:var(--muted);text-align:center}
+
+.aw-body{margin:0;padding:14px 16px;color:#2f3456;font-size:13px;line-height:1.65;white-space:pre-wrap}
+.aw-panel-body{padding:14px;display:grid;gap:13px;justify-items:start}
+.aw-panel-body>.aw-field,.aw-panel-body>.aw-setup,.aw-panel-body>.aw-compare{width:100%}
+.aw-setup{padding:12px 14px;border:1px solid #e3e0f6;border-radius:10px;background:#fbfaff;font-size:12px}
+.aw-setup b{font:800 14px 'Manrope'}
+.aw-setup p{margin:5px 0 0;line-height:1.55}
+.aw-muted{color:var(--muted)}
+.automation-workspace-page .small{margin:0;font-size:11px}
+.aw-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.aw-compare>div{padding:12px 14px;border:1px solid #e3e0f6;border-radius:10px;background:#fbfaff}
+.aw-compare .wide{grid-column:1/-1}
+.aw-compare small{color:var(--purple);font-size:10px;font-weight:900;letter-spacing:.08em}
+.aw-compare p{margin:5px 0 0;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.aw-blocked{width:100%;margin:0;padding:12px 14px;border:1px dashed #f1d3a3;border-radius:10px;color:#8a520b;background:#fffaf0;font-size:12px}
+
+.aw-notice{padding:10px 12px;display:flex;align-items:center;gap:9px;border:1px solid #b7e4ca;border-radius:9px;color:#185c37;background:#f2fcf6;font-size:12px;font-weight:700}
+.aw-notice>span{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;color:#fff;background:#13a763;font-size:11px}
+.aw-notice button{margin-left:auto;border:0;background:none;color:#185c37;font-size:17px}
+.aw-disclaimer{margin:0;color:#7a7f97;font-size:11px}
+
+.aw-modal-backdrop{position:fixed;inset:0;z-index:50;padding:16px;display:grid;place-items:center;background:#11143b8c}
+.aw-modal{width:min(680px,100%);max-height:92vh;overflow:auto;padding:20px;display:grid;gap:13px;border-radius:15px;background:#fff;box-shadow:0 30px 80px #11143b40;color:var(--ink)}
+.aw-modal>header{display:flex;align-items:flex-start;justify-content:space-between}
+.aw-modal>header,.aw-modal footer{max-width:none;margin:0}
+.aw-modal>header span{color:var(--purple);font-size:10px;font-weight:900;letter-spacing:.12em}
+.aw-modal h2{margin:2px 0 0;font:800 22px 'Manrope'}
+.aw-modal>header button{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:18px}
+.aw-modal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.aw-modal-warning{margin:0;color:#9a5a0b;font-size:12px}
+.aw-modal footer{display:flex;justify-content:flex-end;gap:8px}
+.workspace .automation-workspace-page .aw-modal>header{justify-content:space-between}
+
+@media(max-width:1000px){.aw-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.automation-workspace .workspace-content{padding:0 12px 22px}.aw-title{flex-direction:column;align-items:flex-start}.aw-title-badges{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.aw-risk,.aw-modal-grid,.aw-compare{grid-template-columns:1fr}.aw-hint{flex-wrap:wrap}.aw-hint button{margin-left:0}.aw-card>header{flex-wrap:wrap}.aw-stats strong{font-size:18px}}
