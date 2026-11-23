@@ -114,3 +114,6 @@
 
 @media(max-width:1000px){.aw-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.aw-views{width:100%}.aw-views button{flex:1}.automation-workspace .workspace-content{padding:0 12px 22px}.aw-title{flex-direction:column;align-items:flex-start}.aw-title-badges{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.aw-risk,.aw-modal-grid,.aw-compare{grid-template-columns:1fr}.aw-card>header{flex-wrap:wrap}.aw-stats strong{font-size:18px}}
+
+.aw-views { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.aw-views .aw-stock-search-link { margin-left: auto; }

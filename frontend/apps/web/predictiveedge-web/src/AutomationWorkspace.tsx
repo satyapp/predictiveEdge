@@ -85,12 +85,7 @@ export function AutomationWorkspace({ userId, candidates, dataSource: providedSo
   function openRun(item: AutomationRun) { setRun(item); setView('current'); }
 
   return <div className="automation-workspace-page">
-    <section className="aw-title">
-      <div><span>AI TRADE AUTOMATION</span><h1>Automation Workspace</h1><p>{view === 'history' ? 'History of automation runs started from the Stock Search intraday list.' : run ? `Run started ${displayDate(run.tradingDate)}, ${displayTime(run.createdAt)} · Size, review and backtest Level 2 AI trade ideas before any order.` : 'Size, review and backtest Level 2 AI trade ideas before any order.'}</p></div>
-      <div className="aw-title-badges"><em className="aw-demo">{dataSource.live ? 'LIVE DATA' : 'NO LIVE ORDERS'}</em>{view === 'current' && run && <em className="aw-source">{run.items.length} stocks from Intraday List</em>}</div>
-    </section>
-
-    <nav className="aw-views" aria-label="Automation views"><button type="button" className={view === 'current' ? 'active' : ''} onClick={() => setView('current')}>Current processing</button><button type="button" className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>History</button></nav>
+    <nav className="aw-views" aria-label="Automation views"><button type="button" className={view === 'current' ? 'active' : ''} onClick={() => setView('current')}>Current processing</button><button type="button" className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>Automation History</button>{onOpenStockSearch && <button type="button" className="aw-secondary aw-stock-search-link" onClick={onOpenStockSearch}>Stock Search →</button>}</nav>
     {error && <p className="aw-warning" role="alert">⚠ {error}</p>}
 
     {view === 'history' && <AutomationHistory runs={runs} loading={loading} activeRunId={run?.id} onOpen={openRun} onOpenStockSearch={onOpenStockSearch} />}
@@ -252,7 +247,7 @@ function AutomationRunView({ run, dataSource, onChange }: { run: AutomationRun; 
     </section>
     {portfolioWarning && <p className="aw-warning" role="alert">⚠ {portfolioWarning}</p>}
 
-    <nav className="aw-tabs" role="tablist" aria-label="Automation review steps">{tabs.map((item, index) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}><i>{index + 1}</i>{item.label}</button>)}</nav>
+    <nav className="aw-tabs" role="tablist" aria-label="Automation review steps">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</nav>
 
     {tab === 'analysis' && <>
       <section className="aw-card">
@@ -311,7 +306,7 @@ function AutomationRunView({ run, dataSource, onChange }: { run: AutomationRun; 
       </section>
       <section className="aw-card">
         <header><span>◷</span><h2>Backtest Results</h2></header>
-        <div className="aw-panel-body"><p className="aw-muted">Awaiting FYERS backtesting integration. Win rate, drawdown, profit factor, slippage and historical trades will appear here.</p><div className="aw-buttons"><button type="button" className="aw-primary" disabled>Approve Live Order</button></div></div>
+        <div className="aw-panel-body"><p className="aw-muted">Awaiting authorized FYERS integration. Win rate, drawdown, profit factor, slippage and historical trades will appear here.</p><div className="aw-buttons"><button type="button" className="aw-primary" disabled>Approve Live Order</button></div></div>
       </section>
     </>}
 
