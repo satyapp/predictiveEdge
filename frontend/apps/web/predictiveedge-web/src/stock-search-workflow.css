@@ -1,0 +1,40 @@
+.ss-source-badge {
+  margin-left: auto;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .05em;
+}
+
+.ss-source-badge.broker {
+  color: #17693e;
+  background: #dff7e8;
+}
+
+.ss-source-badge.ai {
+  color: #5634c5;
+  background: #e9e3ff;
+}
+
+.ss-empty-row td {
+  height: 74px !important;
+  color: #747b90 !important;
+  background: #fff !important;
+  text-align: center !important;
+  font-size: 10px !important;
+}
+
+.ss-empty-row b {
+  color: #4e31c2;
+}
+
+.ss-empty-row.error td {
+  color: #9d2f2f !important;
+  background: #fff4f4 !important;
+}
+
+.ss-empty-row.error b {
+  color: #b42318;
+}

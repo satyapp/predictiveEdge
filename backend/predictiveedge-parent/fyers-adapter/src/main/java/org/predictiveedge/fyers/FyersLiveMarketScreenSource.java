@@ -62,26 +62,38 @@ final class FyersLiveMarketScreenSource implements LiveMarketScreenSource {
         }
         if (request.userId() == null) throw new IllegalArgumentException("User identity is required for FYERS");
         String authorization = connections.authorization(request.userId());
+        if ("CUSTOM".equalsIgnoreCase(request.setup())) {
+            List<String> selected = java.util.Arrays.stream(request.selectedSymbol().split(","))
+                    .map(String::trim).filter(value -> !value.isBlank()).map(FyersLiveMarketScreenSource::providerSymbol)
+                    .distinct().limit(request.maximumRows()).toList();
+            if (selected.isEmpty()) throw new IllegalArgumentException("At least one custom NSE symbol is required");
+            return dataCopy(request, "custom", selected, client.quotes(authorization, String.join(",", selected)));
+        }
+        if (!request.selectedSymbol().isBlank()) {
+            List<String> selected = java.util.Arrays.stream(request.selectedSymbol().split(","))
+                    .map(String::trim).filter(value -> !value.isBlank()).map(FyersLiveMarketScreenSource::providerSymbol)
+                    .distinct().limit(request.maximumRows()).toList();
+            if (selected.isEmpty()) throw new IllegalArgumentException("At least one selected NSE symbol is required");
+            return dataCopy(request, "selected-for-ai", selected,
+                    client.quotes(authorization, String.join(",", selected)));
+        }
         JsonNode config = configuration(authorization);
-        JsonNode screener = findConfiguredObject(config, SETUP_TERMS.getOrDefault(request.setup(), List.of()));
+        JsonNode screener = findConfiguredEntry(config.path("data").path("screeners_standard"),
+                SETUP_TERMS.getOrDefault(request.setup(), List.of()));
         if (screener == null) throw new IllegalStateException("FYERS configuration does not advertise the selected setup: " + request.setup());
         String screenerId = identifier(screener);
         if (screenerId.isBlank()) throw new IllegalStateException("FYERS did not provide an identifier for " + request.setup());
-        JsonNode universe = findConfiguredObject(config, List.of("nifty 500"));
+        JsonNode universe = findConfiguredEntry(config.path("data").path("universes"),
+                universeTerms(request.universe()));
         String universeId = universe == null ? "" : identifier(universe);
-        if (universeId.isBlank()) throw new IllegalStateException("FYERS configuration does not advertise a Nifty 500 universe");
+        if (universeId.isBlank()) throw new IllegalStateException("FYERS configuration does not advertise the selected universe: " + request.universe());
         var parameters = new LinkedHashMap<String, String>();
-        parameters.put("screener_id", screenerId); parameters.put("universe", universeId);
-        String supported = screener.toString().toLowerCase(Locale.ROOT);
-        if (supported.contains("timeframe") && !request.timeframe().isBlank()) parameters.put("timeframe", request.timeframe());
+        parameters.put("screener_id", screenerId);
+        if (supports(screener, "universe")) parameters.put("universe", universeId);
+        if (supports(screener, "timeframe") && allowedTimeframe(screener, request.timeframe()))
+            parameters.put("timeframe", request.timeframe());
         JsonNode screen = client.standardScreener(authorization, parameters);
         List<String> discovered = symbols(screen);
-        if (!request.selectedSymbol().isBlank()) {
-            String selected = normalize(request.selectedSymbol());
-            if (discovered.stream().noneMatch(value -> normalize(value).equals(selected)))
-                throw new IllegalStateException("The selected stock is no longer present in the FYERS setup");
-            discovered = discovered.stream().filter(value -> normalize(value).equals(selected)).toList();
-        }
         if (discovered.isEmpty()) throw new IllegalStateException("FYERS returned no Nifty 500 equities for the selected setup");
         discovered = discovered.stream().limit(request.maximumRows()).toList();
         JsonNode quotes = client.quotes(authorization, String.join(",", discovered));
@@ -132,16 +144,31 @@ final class FyersLiveMarketScreenSource implements LiveMarketScreenSource {
             return cachedConfig;
         }
     }
-    private static JsonNode findConfiguredObject(JsonNode node, List<String> terms) {
-        if (node == null || terms.isEmpty()) return null;
-        if (node.isObject()) {
-            String text = node.toString().toLowerCase(Locale.ROOT).replace('_', ' ').replace('-', ' ');
-            boolean match = terms.stream().map(value -> value.replace('-', ' ')).anyMatch(text::contains);
-            if (match && !identifier(node).isBlank()) return node;
-            var fields = node.fields();
-            while (fields.hasNext()) { JsonNode found = findConfiguredObject(fields.next().getValue(), terms); if (found != null) return found; }
-        } else if (node.isArray()) for (JsonNode child : node) { JsonNode found = findConfiguredObject(child, terms); if (found != null) return found; }
+    static JsonNode findConfiguredEntry(JsonNode entries, List<String> terms) {
+        if (entries == null || !entries.isArray() || terms.isEmpty()) return null;
+        for (JsonNode entry : entries) {
+            if (!entry.isObject() || identifier(entry).isBlank()) continue;
+            String text = String.join(" ", entry.path("name").asText(), entry.path("category").asText(),
+                    entry.path("description").asText(), entry.path("conditions").asText())
+                    .toLowerCase(Locale.ROOT).replace('_', ' ').replace('-', ' ');
+            boolean match = terms.stream().map(value -> value.toLowerCase(Locale.ROOT).replace('-', ' '))
+                    .anyMatch(text::contains);
+            if (match) return entry;
+        }
         return null;
+    }
+    private static boolean supports(JsonNode screener, String parameter) {
+        JsonNode supported = screener.path("supported_params");
+        if (!supported.isArray()) return false;
+        for (JsonNode value : supported) if (parameter.equalsIgnoreCase(value.asText())) return true;
+        return false;
+    }
+    private static boolean allowedTimeframe(JsonNode screener, String timeframe) {
+        if (timeframe == null || timeframe.isBlank()) return false;
+        JsonNode allowed = screener.path("allowed_timeframes");
+        if (!allowed.isArray()) return false;
+        for (JsonNode value : allowed) if (timeframe.equalsIgnoreCase(value.asText())) return true;
+        return false;
     }
     private static String identifier(JsonNode node) {
         for (String name : List.of("screener_id", "id", "value", "code", "key"))
@@ -180,6 +207,18 @@ final class FyersLiveMarketScreenSource implements LiveMarketScreenSource {
     private static String normalize(String value) {
         String symbol = Objects.requireNonNullElse(value, "").toUpperCase(Locale.ROOT);
         if (symbol.startsWith("NSE:")) symbol = symbol.substring(4); if (symbol.endsWith("-EQ")) symbol = symbol.substring(0, symbol.length() - 3); return symbol;
+    }
+    private static String providerSymbol(String value) {
+        String symbol = normalize(value);
+        if (symbol.isBlank() || !symbol.matches("[A-Z0-9&_.-]+"))
+            throw new IllegalArgumentException("Invalid NSE equity symbol: " + value);
+        return "NSE:" + symbol + "-EQ";
+    }
+    private static List<String> universeTerms(String value) {
+        String normalized = Objects.requireNonNullElse(value, "").toLowerCase(Locale.ROOT).replace('_', ' ').trim();
+        if (normalized.isBlank()) return List.of("nifty 500");
+        if (normalized.contains("all nse") || normalized.contains("all equities")) return List.of("all stocks", "all equities");
+        return List.of(normalized);
     }
     private static String message(Throwable failure) { return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage(); }
 }

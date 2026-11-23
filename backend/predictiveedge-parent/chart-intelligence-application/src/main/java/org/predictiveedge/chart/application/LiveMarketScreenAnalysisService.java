@@ -21,11 +21,17 @@ public final class LiveMarketScreenAnalysisService {
 
     public List<LiveMarketScreenSource.Capability> capabilities() { return source.capabilities(); }
 
-    public Result analyze(Command command) {
+    /** Fetches broker screener rows only. Historical and AI analysis must be requested separately. */
+    public MarketScreenDataCopy search(Command command) {
         Objects.requireNonNull(command, "Live market-screen command is required");
-        MarketScreenDataCopy dataCopy = source.fetch(new LiveMarketScreenSource.FetchRequest(
+        return source.fetch(new LiveMarketScreenSource.FetchRequest(
                 command.userId(), command.screenType(), command.setup(), command.universe(), command.timeframe(),
                 command.maximumCandidates(), command.selectedSymbol()));
+    }
+
+    public Result analyze(Command command) {
+        Objects.requireNonNull(command, "Live market-screen command is required");
+        MarketScreenDataCopy dataCopy = search(command);
         Instant effectiveCutoff = command.analysisCutoff().isBefore(dataCopy.observedAt())
                 ? dataCopy.observedAt() : command.analysisCutoff();
         var deterministic = downstream.analyzeCanonical(new MarketScreenHistoricalAnalysisService.CanonicalCommand(

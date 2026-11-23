@@ -3,17 +3,41 @@ import { AuthSession, clearStoredSession, loadStoredSession, login, logout, regi
 import { beginZerodhaConnection, BrokerOverview, disconnectZerodhaConnection, loadBrokerOverview, releaseZerodhaBrowserLease } from './broker';
 import { MarketIntelligenceDashboard } from './MarketIntelligenceDashboard';
 import { IntradayOpportunityEngine } from './IntradayOpportunityEngine';
+import { StockSearchPage } from './StockSearchPage';
+import { AutomationWorkspace } from './AutomationWorkspace';
+import { AutomationCandidate } from './automation';
 import './broker.css';
 import './preopen-diagnostics.css';
 import './intelligence-dashboard.css';
 import './dashboard-overrides.css';
 import './live-stock-discovery.css';
 import './intraday-opportunity-engine.css';
+import './workspace-sidebar.css';
 
 type Screen = 'login' | 'register' | 'verify';
 
 function Brand() {
   return <div className="brand"><span className="brand-mark">PE</span><span>Predictive<b>Edge</b></span></div>;
+}
+
+type WorkspacePage = 'DASHBOARD' | 'SEARCH' | 'INTRADAY' | 'HISTORY' | 'LIST' | 'AUTOMATION' | 'BACKTEST' | 'PAPER' | 'MANUAL' | 'KNOWLEDGE' | 'SETTINGS';
+
+const workspaceItems: { page: WorkspacePage; label: string; icon: string }[] = [
+  { page: 'DASHBOARD', label: 'Dashboard', icon: '⌂' }, { page: 'SEARCH', label: 'Stock Search', icon: '⌕' },
+  { page: 'INTRADAY', label: 'Intraday Engine', icon: 'ϟ' }, { page: 'HISTORY', label: 'Analysis History', icon: '◷' },
+  { page: 'LIST', label: 'Intraday List', icon: '☷' }, { page: 'AUTOMATION', label: 'Automation', icon: '▷' },
+  { page: 'BACKTEST', label: 'Backtest', icon: '▣' }, { page: 'PAPER', label: 'Paper Trading', icon: '▤' },
+  { page: 'MANUAL', label: 'Market Intelligence', icon: '◎' }, { page: 'KNOWLEDGE', label: 'Knowledge', icon: '⬡' },
+  { page: 'SETTINGS', label: 'Settings', icon: '⚙' },
+];
+
+function WorkspaceSidebar({ page, onChange }: { page: WorkspacePage; onChange: (page: WorkspacePage) => void }) {
+  return <aside className="workspace-sidebar"><Brand /><nav aria-label="PredictiveEdge workspace">{workspaceItems.map((item) =>
+    <button type="button" key={item.page} className={page === item.page ? 'active' : ''} onClick={() => onChange(item.page)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav></aside>;
+}
+
+function FutureWorkspace({ title }: { title: string }) {
+  return <section className="future-workspace"><span>PE</span><p className="eyebrow">PREDICTIVEEDGE WORKSPACE</p><h1>{title}</h1><p>This workspace is present in the product navigation and will be connected in its dedicated implementation phase.</p></section>;
 }
 
 function LoginForm({ onAuthenticated, onRegister }: { onAuthenticated: (session: AuthSession) => void; onRegister: () => void }) {
@@ -120,7 +144,15 @@ function Workspace({ session, onSignedOut }: { session: AuthSession; onSignedOut
 
 function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [workspacePage, setWorkspacePage] = useState<'MANUAL' | 'INTRADAY'>('MANUAL');
+  const [workspacePage, setWorkspacePage] = useState<WorkspacePage>('SEARCH');
+  const [automationCandidates, setAutomationCandidates] = useState<AutomationCandidate[]>();
+  const [automationVisit, setAutomationVisit] = useState(0);
+
+  // The sidebar opens Automation on its history; only the Stock Search "Automate" button starts a run.
+  function openWorkspacePage(page: WorkspacePage) {
+    if (page === 'AUTOMATION') { setAutomationCandidates(undefined); setAutomationVisit((visit) => visit + 1); }
+    setWorkspacePage(page);
+  }
   const [broker, setBroker] = useState<BrokerOverview>();
   const [brokerError, setBrokerError] = useState('');
 
@@ -170,15 +202,20 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
     } finally { setBusy(false); }
   }
 
-  return <main className="workspace"><header><Brand /><nav className="workspace-nav"><button type="button" className={workspacePage === 'MANUAL' ? 'active' : ''} onClick={() => setWorkspacePage('MANUAL')}>Market Intelligence</button><button type="button" className={workspacePage === 'INTRADAY' ? 'active' : ''} onClick={() => setWorkspacePage('INTRADAY')}>Intraday Screener</button></nav><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
-    <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>
+  const pageTitle = workspaceItems.find((item) => item.page === workspacePage)?.label ?? 'Workspace';
+  return <main className={`workspace workspace-shell ${workspacePage === 'SEARCH' ? 'stock-search-workspace' : ''} ${workspacePage === 'AUTOMATION' ? 'automation-workspace' : ''}`}><WorkspaceSidebar page={workspacePage} onChange={openWorkspacePage} /><div className="workspace-stage"><header><div><small>TRADING WORKSPACE</small><b>{pageTitle}</b></div><span className="workspace-user">{session.user.displayName.slice(0, 2).toUpperCase()}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
+    {!['SEARCH', 'AUTOMATION'].includes(workspacePage) && <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>}
+    {/* Stock Search stays mounted so its intraday list survives a trip to Automation and back. */}
+    <div hidden={workspacePage !== 'SEARCH'}><StockSearchPage session={session} onAutomate={(candidates) => { setAutomationCandidates(candidates); setAutomationVisit((visit) => visit + 1); setWorkspacePage('AUTOMATION'); }} /></div>
+    {workspacePage === 'AUTOMATION' && <AutomationWorkspace key={automationVisit} userId={session.user.id} candidates={automationCandidates} onOpenStockSearch={() => openWorkspacePage('SEARCH')} />}
     {workspacePage === 'MANUAL' && <MarketIntelligenceDashboard session={session} broker={broker} />}
     {workspacePage === 'INTRADAY' && <IntradayOpportunityEngine session={session} broker={broker}
       connectionBusy={busy} onConnectZerodha={connectZerodha} onDisconnectZerodha={disconnectZerodha} />}
+    {!['SEARCH', 'MANUAL', 'INTRADAY', 'AUTOMATION'].includes(workspacePage) && <FutureWorkspace title={pageTitle} />}
     {brokerError && <p className="error" role="alert">{brokerError}</p>}
-    <div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
-    <div className="identity-summary"><span><small>VERIFIED EMAIL</small>{session.user.email}</span><span><small>VERIFIED MOBILE</small>{session.user.mobileNumber}</span></div>
-  </section></main>;
+    {!['SEARCH', 'AUTOMATION'].includes(workspacePage) && <><div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
+    <div className="identity-summary"><span><small>VERIFIED EMAIL</small>{session.user.email}</span><span><small>VERIFIED MOBILE</small>{session.user.mobileNumber}</span></div></>}
+  </section></div></main>;
 }
 
 export function App() {

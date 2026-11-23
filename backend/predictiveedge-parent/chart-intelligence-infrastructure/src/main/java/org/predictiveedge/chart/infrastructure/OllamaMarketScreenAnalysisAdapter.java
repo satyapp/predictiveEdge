@@ -26,9 +26,8 @@ import org.predictiveedge.chart.domain.IntradaySetupAction;
 public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOllamaAnalysisPort {
     private static final String SYSTEM = """
             You are PredictiveEdge's preliminary NSE market-screen analyst. Use only supplied deterministic facts.
-            Never invent news, fundamentals, prices, indicators, probabilities, or events. Preserve every supplied
-            action exactly: BUY_CANDIDATE=LONG_WATCH, SELL_CANDIDATE=SHORT_WATCH, WAIT=WAIT,
-            INSUFFICIENT_EVIDENCE=INSUFFICIENT_EVIDENCE. Explain thesis, confirmation, and the kill condition.
+            Never invent news, fundamentals, prices, indicators, probabilities, or events. Return every supplied
+            symbol exactly once and preserve its required_stance exactly. Explain thesis, confirmation, and the kill condition.
             Evaluate Market, Chart, Scanner, Strategy, Risk, Portfolio, Learning, Data Quality, Regime Drift,
             Execution, Validation and Calibration. Respect provider status; unavailable data is not negative data.
             Trendlyne technical and fundamental/SWOT evidence is supplementary. Call out conflicts and never use
@@ -56,11 +55,12 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
     public StageOneAiResult analyze(MarketScreenHistoricalAnalysisService.Result result) {
         String evidenceJson = write(compact(result));
         Map<String, String> expected = new LinkedHashMap<>();
+        result.ranking().candidates().forEach(value -> expected.put(value.symbol(), "INSUFFICIENT_EVIDENCE"));
         result.analyses().forEach(value -> expected.put(value.assessment().symbol(), stance(value.assessment().action())));
         if (expected.isEmpty()) {
             var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), false, "NO_SETUP",
-                    "No stock completed Zerodha historical analysis, so Ollama was not invoked.", List.of(),
-                    List.of("Resolve the per-stock historical failures before relying on this screen."));
+                    "The broker screen contained no candidates, so Ollama was not invoked.", List.of(),
+                    List.of("Run the broker screen again before requesting AI analysis."));
             return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
         }
         ObjectNode request = json.createObjectNode(); request.put("model", model).put("stream", false).put("think", false);
@@ -100,6 +100,23 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
     private ObjectNode compact(MarketScreenHistoricalAnalysisService.Result result) {
         ObjectNode root = json.createObjectNode(); root.put("authority", result.authority());
         root.put("screen_type", result.screenType().name()); root.put("ranking_score_version", result.ranking().scoreVersion());
+        Map<String, org.predictiveedge.chart.domain.MarketScreenTechnicalAssessment> assessments = result.analyses()
+                .stream().collect(java.util.stream.Collectors.toMap(value -> value.assessment().symbol(),
+                        MarketScreenHistoricalAnalysisService.InstrumentAnalysis::assessment));
+        Map<String, String> failures = result.failures().stream().collect(java.util.stream.Collectors.toMap(
+                MarketScreenHistoricalAnalysisService.InstrumentFailure::symbol,
+                MarketScreenHistoricalAnalysisService.InstrumentFailure::reason, (left, right) -> left));
+        ArrayNode brokerCandidates = root.putArray("broker_screen_candidates");
+        result.ranking().candidates().forEach(value -> {
+            ObjectNode node = brokerCandidates.addObject();
+            node.put("symbol", value.symbol()); node.put("screen_rank", value.rank());
+            node.put("screen_score", value.score()); node.put("percent_change", value.percentChange());
+            var assessment = assessments.get(value.symbol());
+            node.put("required_stance", assessment == null
+                    ? "INSUFFICIENT_EVIDENCE" : stance(assessment.action()));
+            if (assessment == null) node.put("historical_data_status", failures.getOrDefault(value.symbol(),
+                    "Historical analysis was unavailable"));
+        });
         ArrayNode values = root.putArray("deterministic_assessments");
         result.analyses().forEach(value -> {
             var assessment = value.assessment(); ObjectNode node = values.addObject();
@@ -112,7 +129,7 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
         root.set("intelligence_evidence", intelligence.collect(
-                result.analyses().stream().map(value -> value.assessment().symbol()).toList(), result.analyzedAt()));
+                result.ranking().candidates().stream().map(value -> value.symbol()).toList(), result.analyzedAt()));
         return root;
     }
 
