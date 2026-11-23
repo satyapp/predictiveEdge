@@ -1,22 +1,13 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AutomationCandidate, AutomationDataSource, createAutomationDataSource, riskBudget, RiskSettings, TradeAction,
-  TradePlan, tradePlan, TradeRecommendation, validRiskSettings,
+  AutomationCandidate, AutomationDataSource, AutomationRun, AutomationRunItem, createAutomationDataSource, newRunItem, riskBudget,
+  TradeAction, TradePlan, tradePlan, TradeRecommendation, validRiskSettings,
 } from './automation';
 import './automation-workspace.css';
 
 type Tab = 'analysis' | 'fia' | 'final' | 'backtest';
-
-type Row = {
-  recommendation: TradeRecommendation;
-  selected: boolean;
-  quantityOverride: number | null;
-  fiaRequested: boolean;
-  fiaReasoning: string;
-  fiaSaved: boolean;
-  finalReasoning: string;
-  finalSaved: boolean;
-};
+type View = 'current' | 'history';
+type Row = AutomationRunItem;
 
 type EditForm = { entry: string; stopLoss: string; target1: string; target2: string; quantity: string; confidence: string; action: TradeAction; reasoning: string };
 
@@ -31,28 +22,116 @@ const rupees = (value: number) => `₹${Math.round(value).toLocaleString('en-IN'
 const price = (value: number) => `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const istDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const displayDate = (isoDate: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${isoDate}T00:00:00Z`));
-
-function toRow(recommendation: TradeRecommendation): Row {
-  return { recommendation, selected: true, quantityOverride: null, fiaRequested: false, fiaReasoning: '', fiaSaved: false, finalReasoning: '', finalSaved: false };
-}
+const displayTime = (timestamp: string) => new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+const runId = () => `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 function tradeSummary(recommendation: TradeRecommendation, plan: TradePlan) {
   return `${recommendation.action} · Entry ${price(recommendation.entry)} · Stop ${price(recommendation.stopLoss)} · T1 ${price(recommendation.target1)} · T2 ${price(recommendation.target2)} · Qty ${plan.quantity} · Planned risk ${rupees(plan.plannedLoss)}`;
 }
 
-export function AutomationWorkspace({ candidates, dataSource: providedSource, onOpenStockSearch }: {
+/**
+ * Automation page. Opened from the sidebar it shows the history of automation runs; opened from the
+ * Stock Search "Automate" button it starts a new run for the stocks that were sent and shows it for processing.
+ */
+export function AutomationWorkspace({ userId, candidates, dataSource: providedSource, onOpenStockSearch }: {
+  userId: string;
   candidates?: AutomationCandidate[];
   dataSource?: AutomationDataSource;
   onOpenStockSearch?: () => void;
 }) {
-  const dataSource = useMemo(() => providedSource ?? createAutomationDataSource(), [providedSource]);
-  const [tradingDate] = useState(istDate);
-  const [capitalInput, setCapitalInput] = useState('100000');
-  const [riskInput, setRiskInput] = useState('1');
-  const [rows, setRows] = useState<Row[]>([]);
-  const [activeSymbol, setActiveSymbol] = useState('');
+  const dataSource = useMemo(() => providedSource ?? createAutomationDataSource(userId), [providedSource, userId]);
+  const [view, setView] = useState<View>(candidates?.length ? 'current' : 'history');
+  const [run, setRun] = useState<AutomationRun>();
+  const [runs, setRuns] = useState<AutomationRun[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // A new hand-off from Stock Search starts a new run for current processing.
+  useEffect(() => {
+    if (!candidates?.length) return;
+    let mounted = true;
+    const tradingDate = istDate();
+    setView('current'); setLoading(true); setError('');
+    dataSource.loadRecommendations({ tradingDate, candidates })
+      .then(async (recommendations) => {
+        if (!mounted) return;
+        const now = new Date().toISOString();
+        const created: AutomationRun = { id: runId(), tradingDate, createdAt: now, updatedAt: now, source: 'INTRADAY_LIST', settings: { capital: 100000, riskPercent: 1 }, items: recommendations.map(newRunItem) };
+        setRun(created);
+        await dataSource.saveRun(created);
+      })
+      .catch((failure) => mounted && setError(failure instanceof Error ? failure.message : 'Recommendations could not be loaded.'))
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
+  }, [candidates, dataSource]);
+
+  useEffect(() => {
+    if (view !== 'history') return;
+    let mounted = true;
+    setLoading(true); setError('');
+    dataSource.listRuns()
+      .then((items) => mounted && setRuns(items))
+      .catch((failure) => mounted && setError(failure instanceof Error ? failure.message : 'Automation history could not be loaded.'))
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
+  }, [dataSource, view]);
+
+  function changeRun(next: AutomationRun) {
+    const updated = { ...next, updatedAt: new Date().toISOString() };
+    setRun(updated);
+    void dataSource.saveRun(updated).catch((failure) => setError(failure instanceof Error ? failure.message : 'The automation run could not be saved.'));
+  }
+
+  function openRun(item: AutomationRun) { setRun(item); setView('current'); }
+
+  return <div className="automation-workspace-page">
+    <section className="aw-title">
+      <div><span>AI TRADE AUTOMATION</span><h1>Automation Workspace</h1><p>{view === 'history' ? 'History of automation runs started from the Stock Search intraday list.' : run ? `Run started ${displayDate(run.tradingDate)}, ${displayTime(run.createdAt)} · Size, review and backtest Level 2 AI trade ideas before any order.` : 'Size, review and backtest Level 2 AI trade ideas before any order.'}</p></div>
+      <div className="aw-title-badges"><em className="aw-demo">{dataSource.live ? 'LIVE DATA' : 'NO LIVE ORDERS'}</em>{view === 'current' && run && <em className="aw-source">{run.items.length} stocks from Intraday List</em>}</div>
+    </section>
+
+    <nav className="aw-views" aria-label="Automation views"><button type="button" className={view === 'current' ? 'active' : ''} onClick={() => setView('current')}>Current processing</button><button type="button" className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>History</button></nav>
+    {error && <p className="aw-warning" role="alert">⚠ {error}</p>}
+
+    {view === 'history' && <AutomationHistory runs={runs} loading={loading} activeRunId={run?.id} onOpen={openRun} onOpenStockSearch={onOpenStockSearch} />}
+    {view === 'current' && (run
+      ? <AutomationRunView key={run.id} run={run} dataSource={dataSource} onChange={changeRun} />
+      : <div className="aw-empty-state"><span>▷</span><h2>{loading ? 'Preparing automation run…' : 'No automation run in progress'}</h2>{!loading && <p>Add stocks to today's Intraday List on Stock Search and press <b>Automate</b>, or open a past run from History.</p>}{!loading && onOpenStockSearch && <button type="button" className="aw-primary" onClick={onOpenStockSearch}>Open Stock Search</button>}</div>)}
+
+    <p className="aw-disclaimer">{dataSource.label}. Manual review does not substitute for AI-generated final reconciliation.</p>
+  </div>;
+}
+
+function AutomationHistory({ runs, loading, activeRunId, onOpen, onOpenStockSearch }: { runs: AutomationRun[]; loading: boolean; activeRunId?: string; onOpen: (run: AutomationRun) => void; onOpenStockSearch?: () => void }) {
+  if (!runs.length) return <div className="aw-empty-state"><span>◷</span><h2>{loading ? 'Loading automation history…' : 'No automation runs yet'}</h2>{!loading && <p>Runs appear here after you send stocks from the Stock Search intraday list with <b>Automate</b>.</p>}{!loading && onOpenStockSearch && <button type="button" className="aw-primary" onClick={onOpenStockSearch}>Open Stock Search</button>}</div>;
+  return <section className="aw-card">
+    <header><span>◷</span><h2>Automation History</h2><em className="aw-count">{runs.length} runs</em></header>
+    <div className="aw-scroll"><table className="aw-table aw-history"><thead><tr><th>Run</th><th>Stocks</th><th>FIA Reviewed</th><th>Final Saved</th><th>Backtests</th><th>Capital / Risk</th><th>Last Updated</th><th /></tr></thead>
+      <tbody>{runs.map((item) => {
+        const fia = item.items.filter((row) => row.fiaSaved).length;
+        const final = item.items.filter((row) => row.finalSaved).length;
+        const backtests = item.items.filter((row) => row.backtestStatus).length;
+        return <tr key={item.id} className={item.id === activeRunId ? 'active' : ''}>
+          <td><b>{displayDate(item.tradingDate)}</b><small>Started {displayTime(item.createdAt)}</small></td>
+          <td><div className="aw-chips">{item.items.map((row) => <span key={row.recommendation.symbol} className={row.recommendation.action.toLowerCase()}>{row.recommendation.symbol}</span>)}</div></td>
+          <td>{fia} / {item.items.length}</td>
+          <td>{final} / {item.items.length}</td>
+          <td>{backtests}</td>
+          <td>{rupees(item.settings.capital)}<small>{item.settings.riskPercent}% per trade</small></td>
+          <td>{displayDate(item.updatedAt.slice(0, 10))}<small>{displayTime(item.updatedAt)}</small></td>
+          <td><button type="button" className="aw-secondary" onClick={() => onOpen(item)}>Open</button></td>
+        </tr>;
+      })}</tbody></table></div>
+  </section>;
+}
+
+function AutomationRunView({ run, dataSource, onChange }: { run: AutomationRun; dataSource: AutomationDataSource; onChange: (run: AutomationRun) => void }) {
+  const rows = run.items;
+  const setRows = (change: (current: Row[]) => Row[]) => onChange({ ...run, items: change(run.items) });
+  const [capitalInput, setCapitalInput] = useState(String(run.settings.capital));
+  const [riskInput, setRiskInput] = useState(String(run.settings.riskPercent));
+  const [activeSymbol, setActiveSymbol] = useState(run.items[0]?.recommendation.symbol ?? '');
   const [tab, setTab] = useState<Tab>('analysis');
-  const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [fiaDraft, setFiaDraft] = useState('');
   const [finalDraft, setFinalDraft] = useState('');
@@ -61,21 +140,7 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
   const [editError, setEditError] = useState('');
   const reasoningPanel = useRef<HTMLElement>(null);
 
-  const settings: RiskSettings = { capital: Math.max(0, Number(capitalInput) || 0), riskPercent: Math.max(0, Number(riskInput) || 0) };
-
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    dataSource.loadRecommendations({ tradingDate, candidates })
-      .then((recommendations) => {
-        if (!mounted) return;
-        setRows(recommendations.map(toRow));
-        setActiveSymbol(recommendations[0]?.symbol ?? '');
-      })
-      .catch((failure) => mounted && setNotice(failure instanceof Error ? failure.message : 'Recommendations could not be loaded.'))
-      .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
-  }, [candidates, dataSource, tradingDate]);
+  const settings = run.settings;
 
   const active = rows.find((row) => row.recommendation.symbol === activeSymbol);
   const activePlan = active ? tradePlan(active.recommendation, settings, active.quantityOverride) : undefined;
@@ -97,10 +162,10 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
     setRows((current) => current.map((row) => row.recommendation.symbol === symbol ? change(row) : row));
   }
 
-  function changeRisk(setter: (value: string) => void, value: string) {
-    setter(value);
+  function changeRisk(field: 'capital' | 'riskPercent', value: string) {
+    (field === 'capital' ? setCapitalInput : setRiskInput)(value);
     // Sizing inputs changed: quantity overrides and final decisions are no longer valid.
-    setRows((current) => current.map((row) => ({ ...row, quantityOverride: null, finalSaved: false, finalReasoning: '' })));
+    onChange({ ...run, settings: { ...run.settings, [field]: Math.max(0, Number(value) || 0) }, items: run.items.map((row) => ({ ...row, quantityOverride: null, finalSaved: false, finalReasoning: '' })) });
   }
 
   function viewReasoning(symbol: string) {
@@ -117,33 +182,30 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
     catch (failure) { setNotice(failure instanceof Error ? failure.message : 'FIA review could not be requested.'); }
   }
 
-  async function saveFia() {
+  function saveFia() {
     const reasoning = fiaDraft.trim();
     if (!active) return;
     if (!reasoning) return setNotice('Enter the FIA reasoning before saving.');
-    try {
-      await dataSource.saveFiaReview({ tradingDate, symbol: active.recommendation.symbol, reasoning });
-      updateRow(active.recommendation.symbol, (row) => ({ ...row, fiaReasoning: reasoning, fiaSaved: true, finalSaved: false, finalReasoning: '' }));
-      setNotice(`FIA review saved for ${active.recommendation.symbol}.`);
-    } catch (failure) { setNotice(failure instanceof Error ? failure.message : 'FIA review could not be saved.'); }
+    updateRow(active.recommendation.symbol, (row) => ({ ...row, fiaReasoning: reasoning, fiaSaved: true, finalSaved: false, finalReasoning: '' }));
+    setNotice(`FIA review saved for ${active.recommendation.symbol}.`);
   }
 
-  async function saveFinal() {
+  function saveFinal() {
     const reasoning = finalDraft.trim();
     if (!active) return;
     if (!active.fiaSaved) return setNotice('Save the FIA review first.');
     if (!reasoning) return setNotice('Enter the final assessment before saving.');
-    try {
-      await dataSource.saveFinalReview({ tradingDate, symbol: active.recommendation.symbol, reasoning });
-      updateRow(active.recommendation.symbol, (row) => ({ ...row, finalReasoning: reasoning, finalSaved: true }));
-      setNotice(`Final recommendation saved for ${active.recommendation.symbol}.`);
-    } catch (failure) { setNotice(failure instanceof Error ? failure.message : 'Final recommendation could not be saved.'); }
+    updateRow(active.recommendation.symbol, (row) => ({ ...row, finalReasoning: reasoning, finalSaved: true }));
+    setNotice(`Final recommendation saved for ${active.recommendation.symbol}.`);
   }
 
   async function submitBacktest() {
     if (!active || !activePlan) return;
-    try { setNotice((await dataSource.submitBacktest({ recommendation: active.recommendation, plan: activePlan, settings })).message); }
-    catch (failure) { setNotice(failure instanceof Error ? failure.message : 'Backtest could not be submitted.'); }
+    try {
+      const result = await dataSource.submitBacktest({ recommendation: active.recommendation, plan: activePlan, settings });
+      if (result.accepted) updateRow(active.recommendation.symbol, (row) => ({ ...row, backtestStatus: 'SUBMITTED' }));
+      setNotice(result.message);
+    } catch (failure) { setNotice(failure instanceof Error ? failure.message : 'Backtest could not be submitted.'); }
   }
 
   function openEdit(symbol: string) {
@@ -170,22 +232,14 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
   }
 
   const stockPicker = <select aria-label="Stock under review" value={activeSymbol} onChange={(event) => setActiveSymbol(event.target.value)}>{rows.map((row) => <option key={row.recommendation.symbol}>{row.recommendation.symbol}</option>)}</select>;
-  const fromIntradayList = Boolean(candidates?.length);
   const backtestBlocked = !active?.finalSaved || !activePlan?.valid || capitalUsed > settings.capital || !validRiskSettings(settings);
 
-  return <div className="automation-workspace-page">
-    <section className="aw-title">
-      <div><span>AI TRADE AUTOMATION</span><h1>Automation Workspace</h1><p>Intraday equity · {displayDate(tradingDate)} · Size, review and backtest Level 2 AI trade ideas before any order.</p></div>
-      <div className="aw-title-badges"><em className="aw-demo">{dataSource.live ? 'LIVE DATA' : 'DEMO · NO LIVE ORDERS'}</em><em className="aw-source">{fromIntradayList ? `From Intraday List · ${candidates!.length} stocks` : 'Sample recommendations'}</em></div>
-    </section>
-
-    {!fromIntradayList && <div className="aw-hint"><span>ⓘ</span><p>Showing sample recommendations. Add stocks to today's Intraday List on Stock Search and press <b>Automate</b> to review them here.</p>{onOpenStockSearch && <button type="button" onClick={onOpenStockSearch}>Open Stock Search</button>}</div>}
-
+  return <div className="aw-run">
     <section className="aw-card">
       <header><span>₹</span><h2>Capital &amp; Risk Configuration</h2></header>
       <div className="aw-risk">
-        <label>Total Capital (₹)<input type="number" min="1" value={capitalInput} onChange={(event) => changeRisk(setCapitalInput, event.target.value)} /></label>
-        <label>Risk Factor (%) per trade<input type="number" min="0.01" max="100" step="0.1" value={riskInput} onChange={(event) => changeRisk(setRiskInput, event.target.value)} /></label>
+        <label>Total Capital (₹)<input type="number" min="1" value={capitalInput} onChange={(event) => changeRisk('capital', event.target.value)} /></label>
+        <label>Risk Factor (%) per trade<input type="number" min="0.01" max="100" step="0.1" value={riskInput} onChange={(event) => changeRisk('riskPercent', event.target.value)} /></label>
       </div>
       <p className="aw-help">Position size = floor(min(risk budget ÷ stop distance, capital ÷ entry price)). This is a per-trade calculation, not a portfolio allocator.{!validRiskSettings(settings) && <b> Enter a capital above zero and a risk factor between 0 and 100%.</b>}</p>
     </section>
@@ -217,7 +271,7 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
             <td>{plan.rewardToRisk === undefined ? '—' : `${plan.rewardToRisk.toFixed(2)}:1`}</td>
             <td><div className="aw-row-actions"><button type="button" className="aw-secondary" onClick={() => openEdit(r.symbol)}>Edit</button><button type="button" className="aw-primary" onClick={() => void requestFia(r.symbol)}>FIA Review</button></div></td>
           </tr>; })}
-          {rows.length === 0 && <tr className="aw-empty"><td colSpan={11}>{loading ? 'Loading recommendations…' : 'No recommendations for this trading day.'}</td></tr>}</tbody></table></div>
+          {rows.length === 0 && <tr className="aw-empty"><td colSpan={11}>No recommendations in this run.</td></tr>}</tbody></table></div>
       </section>
       <section ref={reasoningPanel} className="aw-card">
         <header><span>☰</span><h2>Level 2 AI Reasoning</h2>{stockPicker}</header>
@@ -262,7 +316,6 @@ export function AutomationWorkspace({ candidates, dataSource: providedSource, on
     </>}
 
     {notice && <div className="aw-notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
-    <p className="aw-disclaimer">{dataSource.live ? 'Live data source connected.' : 'All data is illustrative. No backend, broker API, webhook, persistence or execution is connected yet.'} Manual review does not substitute for AI-generated final reconciliation.</p>
 
     {editing && editForm && <div className="aw-modal-backdrop" role="presentation" onMouseDown={() => setEditing(undefined)}>
       <form className="aw-modal" role="dialog" aria-modal="true" aria-label={`Edit trade ${editing}`} onSubmit={saveEdit} onMouseDown={(event) => event.stopPropagation()}>

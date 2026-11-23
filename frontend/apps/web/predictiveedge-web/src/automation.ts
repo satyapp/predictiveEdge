@@ -1,10 +1,10 @@
 /**
  * Automation workspace domain model and data access.
  *
- * The page talks only to the `AutomationDataSource` interface below. Today it is backed by
- * `demoAutomationDataSource`, which keeps everything in the browser. When the backend is ready,
- * add an HTTP implementation of the same interface (see `marketScreens.ts` for the request style)
- * and return it from `createAutomationDataSource`.
+ * The page talks only to the `AutomationDataSource` interface below. Today it is backed by a
+ * browser-only implementation (localStorage). When the backend is ready, add an HTTP implementation
+ * of the same interface (see `marketScreens.ts` for the request style) and return it from
+ * `createAutomationDataSource`.
  */
 
 export type TradeAction = 'BUY' | 'SELL';
@@ -49,15 +49,46 @@ export type TradePlan = {
 
 export type BacktestSubmission = { accepted: boolean; message: string };
 
+/** Review state of one stock inside an automation run. */
+export type AutomationRunItem = {
+  recommendation: TradeRecommendation;
+  selected: boolean;
+  quantityOverride: number | null;
+  fiaRequested: boolean;
+  fiaReasoning: string;
+  fiaSaved: boolean;
+  finalReasoning: string;
+  finalSaved: boolean;
+  backtestStatus?: string;
+};
+
+/** One automation run: the stocks sent from Stock Search on a given day and how far each got through review. */
+export type AutomationRun = {
+  id: string;
+  tradingDate: string;
+  createdAt: string;
+  updatedAt: string;
+  source: 'INTRADAY_LIST';
+  settings: RiskSettings;
+  items: AutomationRunItem[];
+};
+
 export interface AutomationDataSource {
-  /** Human readable label shown on the page so nobody mistakes demo data for live data. */
+  /** Human readable label shown on the page so nobody mistakes local data for live data. */
   readonly label: string;
   readonly live: boolean;
-  loadRecommendations(request: { tradingDate: string; candidates?: AutomationCandidate[] }): Promise<TradeRecommendation[]>;
+  /** Level 2 AI recommendations for the stocks sent from Stock Search. */
+  loadRecommendations(request: { tradingDate: string; candidates: AutomationCandidate[] }): Promise<TradeRecommendation[]>;
+  /** Past automation runs, newest first. */
+  listRuns(): Promise<AutomationRun[]>;
+  /** Create or update a run (called whenever its review state changes). */
+  saveRun(run: AutomationRun): Promise<void>;
   requestFiaReview(request: { recommendation: TradeRecommendation; plan: TradePlan }): Promise<{ message: string }>;
-  saveFiaReview(request: { tradingDate: string; symbol: string; reasoning: string }): Promise<void>;
-  saveFinalReview(request: { tradingDate: string; symbol: string; reasoning: string }): Promise<void>;
   submitBacktest(request: { recommendation: TradeRecommendation; plan: TradePlan; settings: RiskSettings }): Promise<BacktestSubmission>;
+}
+
+export function newRunItem(recommendation: TradeRecommendation): AutomationRunItem {
+  return { recommendation, selected: true, quantityOverride: null, fiaRequested: false, fiaReasoning: '', fiaSaved: false, finalReasoning: '', finalSaved: false };
 }
 
 export function isValidTradeSequence(trade: Pick<TradeRecommendation, 'action' | 'entry' | 'stopLoss' | 'target1' | 'target2'>): boolean {
@@ -106,34 +137,27 @@ export function validRiskSettings(settings: RiskSettings): boolean {
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Demo data source                                                                            */
+/* Local data source                                                                           */
 /* ------------------------------------------------------------------------------------------ */
-
-const demoSeed: Omit<TradeRecommendation, 'tradingDate'>[] = [
-  { symbol: 'ICICIBANK', category: 'VWAP Breakout', rank: 1, confidence: 86, action: 'BUY', entry: 1616, stopLoss: 1607, target1: 1630, target2: 1640, reasoning: 'Price reclaimed VWAP with stronger relative volume. Confirm sustained breakout before entry.' },
-  { symbol: 'INFY', category: 'Support / Resistance', rank: 2, confidence: 82, action: 'BUY', entry: 1510, stopLoss: 1498, target1: 1528, target2: 1542, reasoning: 'Support retest followed by bullish recovery. Confirm volume and resistance clearance.' },
-  { symbol: 'RELIANCE', category: 'Previous Day Low', rank: 3, confidence: 79, action: 'SELL', entry: 1460, stopLoss: 1472, target1: 1442, target2: 1430, reasoning: 'Potential downside continuation below previous-day low; validate broader market weakness.' },
-];
 
 const tick = (value: number) => Math.round(value * 20) / 20; // NSE equity tick size is ₹0.05
 
 /** Deterministic illustrative levels for a candidate so the same stock always shows the same demo plan. */
 function demoRecommendation(candidate: AutomationCandidate, tradingDate: string): TradeRecommendation {
-  const seeded = demoSeed.find((item) => item.symbol === candidate.symbol);
   const hash = [...candidate.symbol].reduce((total, character) => total + character.charCodeAt(0), 0);
-  const action: TradeAction = seeded?.action ?? ((candidate.percentChange ?? 0) < 0 ? 'SELL' : 'BUY');
-  const entry = candidate.lastPrice && candidate.lastPrice > 0 ? tick(candidate.lastPrice) : seeded?.entry ?? 500 + hash % 1500;
+  const action: TradeAction = ((candidate.percentChange ?? 0) < 0 ? 'SELL' : 'BUY');
+  const entry = candidate.lastPrice && candidate.lastPrice > 0 ? tick(candidate.lastPrice) : 500 + hash % 1500;
   const direction = action === 'BUY' ? 1 : -1;
   const stopDistance = Math.max(0.05, tick(entry * (0.005 + (hash % 4) / 1000)));
   const reasoning = candidate.reasoning && candidate.reasoning !== 'Awaiting AI analysis.'
     ? candidate.reasoning
-    : seeded?.reasoning ?? `${candidate.category} candidate from today's intraday list. Illustrative ${action === 'BUY' ? 'long' : 'short'} setup: confirm volume and broader market direction before entry.`;
+    : `${candidate.category} candidate from today's intraday list. Illustrative ${action === 'BUY' ? 'long' : 'short'} setup: confirm volume and broader market direction before entry.`;
   return {
     symbol: candidate.symbol,
     tradingDate,
-    category: candidate.category || seeded?.category || 'Intraday List',
+    category: candidate.category || 'Intraday List',
     rank: candidate.rank,
-    confidence: candidate.score && candidate.score > 0 ? Math.min(99, Math.round(candidate.score)) : seeded?.confidence ?? 70 + hash % 20,
+    confidence: candidate.score && candidate.score > 0 ? Math.min(99, Math.round(candidate.score)) : 70 + hash % 20,
     action,
     entry,
     stopLoss: tick(entry - direction * stopDistance),
@@ -143,24 +167,39 @@ function demoRecommendation(candidate: AutomationCandidate, tradingDate: string)
   };
 }
 
-export const demoAutomationDataSource: AutomationDataSource = {
-  label: 'Demo data · no backend or broker connected',
-  live: false,
-  async loadRecommendations({ tradingDate, candidates }) {
-    if (!candidates?.length) return demoSeed.map((item) => ({ ...item, tradingDate }));
-    return candidates.map((candidate) => demoRecommendation(candidate, tradingDate));
-  },
-  async requestFiaReview({ recommendation }) {
-    return { message: `FIA request for ${recommendation.symbol} staged locally. The FYERS FIA webhook is not connected.` };
-  },
-  async saveFiaReview() { /* kept in page state only */ },
-  async saveFinalReview() { /* kept in page state only */ },
-  async submitBacktest() {
-    return { accepted: false, message: 'FYERS backtesting is not connected yet. No backtest was submitted.' };
-  },
-};
+/**
+ * Browser-only data source used until the backend exists. Recommendations are illustrative levels
+ * derived from the stocks sent from Stock Search; runs are kept in this browser's localStorage per user.
+ */
+export function createLocalAutomationDataSource(userId: string): AutomationDataSource {
+  const key = `predictiveedge.automation.runs.${userId}`;
+  const read = (): AutomationRun[] => {
+    try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as AutomationRun[] : []; }
+    catch { return []; }
+  };
+  return {
+    label: 'Saved in this browser · no backend or broker connected',
+    live: false,
+    async loadRecommendations({ tradingDate, candidates }) {
+      return candidates.map((candidate) => demoRecommendation(candidate, tradingDate));
+    },
+    async listRuns() {
+      return read().sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    },
+    async saveRun(run) {
+      const runs = [run, ...read().filter((item) => item.id !== run.id)].slice(0, 100);
+      try { localStorage.setItem(key, JSON.stringify(runs)); } catch { /* storage full or blocked: keep the run in page state only */ }
+    },
+    async requestFiaReview({ recommendation }) {
+      return { message: `FIA request for ${recommendation.symbol} staged locally. The FYERS FIA webhook is not connected.` };
+    },
+    async submitBacktest() {
+      return { accepted: false, message: 'FYERS backtesting is not connected yet. No backtest was submitted.' };
+    },
+  };
+}
 
 /** Single swap point for the backend implementation. */
-export function createAutomationDataSource(): AutomationDataSource {
-  return demoAutomationDataSource;
+export function createAutomationDataSource(userId: string): AutomationDataSource {
+  return createLocalAutomationDataSource(userId);
 }

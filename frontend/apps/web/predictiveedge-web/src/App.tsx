@@ -146,6 +146,13 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
   const [busy, setBusy] = useState(false);
   const [workspacePage, setWorkspacePage] = useState<WorkspacePage>('SEARCH');
   const [automationCandidates, setAutomationCandidates] = useState<AutomationCandidate[]>();
+  const [automationVisit, setAutomationVisit] = useState(0);
+
+  // The sidebar opens Automation on its history; only the Stock Search "Automate" button starts a run.
+  function openWorkspacePage(page: WorkspacePage) {
+    if (page === 'AUTOMATION') { setAutomationCandidates(undefined); setAutomationVisit((visit) => visit + 1); }
+    setWorkspacePage(page);
+  }
   const [broker, setBroker] = useState<BrokerOverview>();
   const [brokerError, setBrokerError] = useState('');
 
@@ -196,11 +203,11 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
   }
 
   const pageTitle = workspaceItems.find((item) => item.page === workspacePage)?.label ?? 'Workspace';
-  return <main className={`workspace workspace-shell ${workspacePage === 'SEARCH' ? 'stock-search-workspace' : ''} ${workspacePage === 'AUTOMATION' ? 'automation-workspace' : ''}`}><WorkspaceSidebar page={workspacePage} onChange={setWorkspacePage} /><div className="workspace-stage"><header><div><small>TRADING WORKSPACE</small><b>{pageTitle}</b></div><span className="workspace-user">{session.user.displayName.slice(0, 2).toUpperCase()}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
+  return <main className={`workspace workspace-shell ${workspacePage === 'SEARCH' ? 'stock-search-workspace' : ''} ${workspacePage === 'AUTOMATION' ? 'automation-workspace' : ''}`}><WorkspaceSidebar page={workspacePage} onChange={openWorkspacePage} /><div className="workspace-stage"><header><div><small>TRADING WORKSPACE</small><b>{pageTitle}</b></div><span className="workspace-user">{session.user.displayName.slice(0, 2).toUpperCase()}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
     {!['SEARCH', 'AUTOMATION'].includes(workspacePage) && <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>}
     {/* Stock Search stays mounted so its intraday list survives a trip to Automation and back. */}
-    <div hidden={workspacePage !== 'SEARCH'}><StockSearchPage session={session} onAutomate={(candidates) => { setAutomationCandidates(candidates); setWorkspacePage('AUTOMATION'); }} /></div>
-    {workspacePage === 'AUTOMATION' && <AutomationWorkspace candidates={automationCandidates} onOpenStockSearch={() => setWorkspacePage('SEARCH')} />}
+    <div hidden={workspacePage !== 'SEARCH'}><StockSearchPage session={session} onAutomate={(candidates) => { setAutomationCandidates(candidates); setAutomationVisit((visit) => visit + 1); setWorkspacePage('AUTOMATION'); }} /></div>
+    {workspacePage === 'AUTOMATION' && <AutomationWorkspace key={automationVisit} userId={session.user.id} candidates={automationCandidates} onOpenStockSearch={() => openWorkspacePage('SEARCH')} />}
     {workspacePage === 'MANUAL' && <MarketIntelligenceDashboard session={session} broker={broker} />}
     {workspacePage === 'INTRADAY' && <IntradayOpportunityEngine session={session} broker={broker}
       connectionBusy={busy} onConnectZerodha={connectZerodha} onDisconnectZerodha={disconnectZerodha} />}

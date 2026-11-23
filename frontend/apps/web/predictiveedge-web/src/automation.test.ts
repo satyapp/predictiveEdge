@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { demoAutomationDataSource, isValidTradeSequence, suggestedQuantity, tradePlan, TradeRecommendation } from './automation';
+import { createLocalAutomationDataSource, isValidTradeSequence, suggestedQuantity, tradePlan, TradeRecommendation } from './automation';
 
 const buy: TradeRecommendation = { symbol: 'ICICIBANK', tradingDate: '2026-11-23', category: 'VWAP Breakout', rank: 1, confidence: 86, action: 'BUY', entry: 1616, stopLoss: 1607, target1: 1630, target2: 1640, reasoning: '' };
 const sell: TradeRecommendation = { ...buy, symbol: 'RELIANCE', action: 'SELL', entry: 1460, stopLoss: 1472, target1: 1442, target2: 1430 };
@@ -29,7 +29,7 @@ describe('automation trade plan', () => {
   });
 
   it('builds valid demo recommendations from intraday list candidates', async () => {
-    const result = await demoAutomationDataSource.loadRecommendations({ tradingDate: '2026-11-23', candidates: [
+    const result = await createLocalAutomationDataSource('test-user').loadRecommendations({ tradingDate: '2026-11-23', candidates: [
       { symbol: 'TCS', category: 'Top Gainers', rank: 1, lastPrice: 3412.35, percentChange: 1.2 },
       { symbol: 'SBIN', category: 'Top Losers', rank: 2, lastPrice: 801.1, percentChange: -0.8 },
     ] });
