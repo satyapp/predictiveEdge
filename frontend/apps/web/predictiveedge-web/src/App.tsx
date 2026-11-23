@@ -4,6 +4,7 @@ import { beginZerodhaConnection, BrokerOverview, disconnectZerodhaConnection, lo
 import { MarketIntelligenceDashboard } from './MarketIntelligenceDashboard';
 import { IntradayOpportunityEngine } from './IntradayOpportunityEngine';
 import { StockSearchPage } from './StockSearchPage';
+import { AutomationPage } from './AutomationPage';
 import './broker.css';
 import './preopen-diagnostics.css';
 import './intelligence-dashboard.css';
@@ -11,6 +12,7 @@ import './dashboard-overrides.css';
 import './live-stock-discovery.css';
 import './intraday-opportunity-engine.css';
 import './workspace-sidebar.css';
+import './automation-page.css';
 
 type Screen = 'login' | 'register' | 'verify';
 
@@ -193,15 +195,16 @@ function BrokerWorkspace({ session, onSignedOut }: { session: AuthSession; onSig
   }
 
   const pageTitle = workspaceItems.find((item) => item.page === workspacePage)?.label ?? 'Workspace';
-  return <main className={`workspace workspace-shell ${workspacePage === 'SEARCH' ? 'stock-search-workspace' : ''}`}><WorkspaceSidebar page={workspacePage} onChange={setWorkspacePage} /><div className="workspace-stage"><header><div><small>TRADING WORKSPACE</small><b>{pageTitle}</b></div><span className="workspace-user">{session.user.displayName.slice(0, 2).toUpperCase()}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
-    {workspacePage !== 'SEARCH' && <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>}
+  return <main className={`workspace workspace-shell ${workspacePage === 'SEARCH' ? 'stock-search-workspace' : ''} ${workspacePage === 'AUTOMATION' ? 'automation-workspace' : ''}`}><WorkspaceSidebar page={workspacePage} onChange={setWorkspacePage} /><div className="workspace-stage"><header><div><small>TRADING WORKSPACE</small><b>{pageTitle}</b></div><span className="workspace-user">{session.user.displayName.slice(0, 2).toUpperCase()}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></header><section className="workspace-content">
+    {!['SEARCH', 'AUTOMATION'].includes(workspacePage) && <div className="workspace-heading"><p className="eyebrow">TRADING WORKSPACE</p><h1>Welcome, {session.user.displayName}</h1><p>Connect market data, validate strategies in simulation, and keep live execution locked.</p></div>}
     {workspacePage === 'SEARCH' && <StockSearchPage session={session} />}
+    {workspacePage === 'AUTOMATION' && <AutomationPage />}
     {workspacePage === 'MANUAL' && <MarketIntelligenceDashboard session={session} broker={broker} />}
     {workspacePage === 'INTRADAY' && <IntradayOpportunityEngine session={session} broker={broker}
       connectionBusy={busy} onConnectZerodha={connectZerodha} onDisconnectZerodha={disconnectZerodha} />}
-    {!['SEARCH', 'MANUAL', 'INTRADAY'].includes(workspacePage) && <FutureWorkspace title={pageTitle} />}
+    {!['SEARCH', 'MANUAL', 'INTRADAY', 'AUTOMATION'].includes(workspacePage) && <FutureWorkspace title={pageTitle} />}
     {brokerError && <p className="error" role="alert">{brokerError}</p>}
-    {workspacePage !== 'SEARCH' && <><div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
+    {!['SEARCH', 'AUTOMATION'].includes(workspacePage) && <><div className="safety-banner"><span>LIVE</span><div><b>Live trading is locked</b><p>Execution remains unavailable until risk controls, audit persistence, and simulation quality gates are complete.</p></div></div>
     <div className="identity-summary"><span><small>VERIFIED EMAIL</small>{session.user.email}</span><span><small>VERIFIED MOBILE</small>{session.user.mobileNumber}</span></div></>}
   </section></div></main>;
 }

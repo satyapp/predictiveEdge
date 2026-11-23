@@ -69,6 +69,14 @@ final class FyersLiveMarketScreenSource implements LiveMarketScreenSource {
             if (selected.isEmpty()) throw new IllegalArgumentException("At least one custom NSE symbol is required");
             return dataCopy(request, "custom", selected, client.quotes(authorization, String.join(",", selected)));
         }
+        if (!request.selectedSymbol().isBlank()) {
+            List<String> selected = java.util.Arrays.stream(request.selectedSymbol().split(","))
+                    .map(String::trim).filter(value -> !value.isBlank()).map(FyersLiveMarketScreenSource::providerSymbol)
+                    .distinct().limit(request.maximumRows()).toList();
+            if (selected.isEmpty()) throw new IllegalArgumentException("At least one selected NSE symbol is required");
+            return dataCopy(request, "selected-for-ai", selected,
+                    client.quotes(authorization, String.join(",", selected)));
+        }
         JsonNode config = configuration(authorization);
         JsonNode screener = findConfiguredEntry(config.path("data").path("screeners_standard"),
                 SETUP_TERMS.getOrDefault(request.setup(), List.of()));
@@ -86,12 +94,6 @@ final class FyersLiveMarketScreenSource implements LiveMarketScreenSource {
             parameters.put("timeframe", request.timeframe());
         JsonNode screen = client.standardScreener(authorization, parameters);
         List<String> discovered = symbols(screen);
-        if (!request.selectedSymbol().isBlank()) {
-            String selected = normalize(request.selectedSymbol());
-            if (discovered.stream().noneMatch(value -> normalize(value).equals(selected)))
-                throw new IllegalStateException("The selected stock is no longer present in the FYERS setup");
-            discovered = discovered.stream().filter(value -> normalize(value).equals(selected)).toList();
-        }
         if (discovered.isEmpty()) throw new IllegalStateException("FYERS returned no Nifty 500 equities for the selected setup");
         discovered = discovered.stream().limit(request.maximumRows()).toList();
         JsonNode quotes = client.quotes(authorization, String.join(",", discovered));
