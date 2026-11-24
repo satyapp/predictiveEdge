@@ -4,5 +4,7 @@ public enum EvidenceFetchStatus {
     SUCCESS,
     UNAVAILABLE,
     UNSUPPORTED,
-    FAILED
+    FAILED,
+    /** Not called because an earlier source in the plan already returned usable evidence. */
+    SKIPPED
 }

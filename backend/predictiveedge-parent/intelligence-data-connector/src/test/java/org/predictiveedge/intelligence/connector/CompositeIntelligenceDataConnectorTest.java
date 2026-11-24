@@ -24,9 +24,83 @@ class CompositeIntelligenceDataConnectorTest {
         assertThat(evidence).extracting(ProviderEvidence::source)
                 .containsExactly(EvidenceSource.NSE, EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
         assertThat(evidence).extracting(ProviderEvidence::status)
-                .containsExactly(EvidenceFetchStatus.SUCCESS, EvidenceFetchStatus.UNAVAILABLE,
-                        EvidenceFetchStatus.UNAVAILABLE);
+                .containsExactly(EvidenceFetchStatus.SUCCESS, EvidenceFetchStatus.SKIPPED,
+                        EvidenceFetchStatus.SKIPPED);
         assertThat(evidence.getFirst().payload()).isEqualTo("nse-quote");
+    }
+
+    @Test
+    void stopsAtFirstUsableSourceAndDoesNotCallLaterSources() {
+        var zerodha = new CountingConnector(EvidenceSource.ZERODHA, EvidenceDomain.MARKET_DATA, "zerodha-quote");
+        var trendlyne = new CountingConnector(EvidenceSource.TRENDLYNE, EvidenceDomain.MARKET_DATA, "trendlyne");
+        var nse = new CountingConnector(EvidenceSource.NSE, EvidenceDomain.MARKET_DATA, "nse-quote");
+        var service = new CompositeIntelligenceDataConnector(List.of(nse, zerodha, trendlyne),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var evidence = service.fetch(EvidenceDomain.MARKET_DATA, QUERY);
+
+        assertThat(nse.calls).isEqualTo(1);
+        assertThat(zerodha.calls).isZero();
+        assertThat(trendlyne.calls).isZero();
+        assertThat(evidence).extracting(ProviderEvidence::status)
+                .containsExactly(EvidenceFetchStatus.SUCCESS, EvidenceFetchStatus.SKIPPED,
+                        EvidenceFetchStatus.SKIPPED);
+        assertThat(evidence.stream().filter(item -> item.status() == EvidenceFetchStatus.SUCCESS)
+                .map(ProviderEvidence::source)).containsExactly(EvidenceSource.NSE);
+        assertThat(evidence.get(1).detail()).contains("earlier source");
+    }
+
+    @Test
+    void fallsThroughToNextSourceWhenEarlierSourceReturnsNothingUsable() {
+        var nse = new CountingConnector(EvidenceSource.NSE, EvidenceDomain.MARKET_DATA, List.of());
+        var zerodha = new CountingConnector(EvidenceSource.ZERODHA, EvidenceDomain.MARKET_DATA, "zerodha-quote");
+        var trendlyne = new CountingConnector(EvidenceSource.TRENDLYNE, EvidenceDomain.MARKET_DATA, "trendlyne");
+        var service = new CompositeIntelligenceDataConnector(List.of(nse, zerodha, trendlyne),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var evidence = service.fetch(EvidenceDomain.MARKET_DATA, QUERY);
+
+        assertThat(nse.calls).isEqualTo(1);
+        assertThat(zerodha.calls).isEqualTo(1);
+        assertThat(trendlyne.calls).isZero();
+        assertThat(evidence).extracting(ProviderEvidence::status)
+                .containsExactly(EvidenceFetchStatus.UNAVAILABLE, EvidenceFetchStatus.SUCCESS,
+                        EvidenceFetchStatus.SKIPPED);
+        assertThat(evidence.get(1).payload()).isEqualTo("zerodha-quote");
+    }
+
+    @Test
+    void fallsThroughWhenEarlierSourceFailsOrIsUnsupported() {
+        var failing = new EvidenceSourceConnector() {
+            @Override public EvidenceSource source() { return EvidenceSource.NSE; }
+            @Override public boolean supports(EvidenceDomain domain) { return true; }
+            @Override public Object fetch(EvidenceDomain domain, EvidenceQuery query) {
+                throw new IllegalStateException("upstream down");
+            }
+        };
+        var trendlyne = new CountingConnector(EvidenceSource.TRENDLYNE, EvidenceDomain.MARKET_DATA, "trendlyne");
+        var service = new CompositeIntelligenceDataConnector(List.of(failing, trendlyne),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var evidence = service.fetch(EvidenceDomain.MARKET_DATA, QUERY);
+
+        assertThat(evidence).extracting(ProviderEvidence::status)
+                .containsExactly(EvidenceFetchStatus.FAILED, EvidenceFetchStatus.UNAVAILABLE,
+                        EvidenceFetchStatus.SUCCESS);
+        assertThat(trendlyne.calls).isEqualTo(1);
+    }
+
+    @Test
+    void callsEachSourceAtMostOncePerFetch() {
+        var nse = new CountingConnector(EvidenceSource.NSE, EvidenceDomain.CORPORATE_ACTIONS, null);
+        var trendlyne = new CountingConnector(EvidenceSource.TRENDLYNE, EvidenceDomain.CORPORATE_ACTIONS, "tl");
+        var service = new CompositeIntelligenceDataConnector(List.of(nse, trendlyne),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        service.fetch(EvidenceDomain.CORPORATE_ACTIONS, QUERY);
+
+        assertThat(nse.calls).isEqualTo(1);
+        assertThat(trendlyne.calls).isEqualTo(1);
     }
 
     @Test
@@ -76,5 +150,28 @@ class CompositeIntelligenceDataConnectorTest {
             @Override public boolean supports(EvidenceDomain domain) { return domain == supported; }
             @Override public Object fetch(EvidenceDomain domain, EvidenceQuery query) { return payload; }
         };
+    }
+
+    /** Supports one domain, returns a fixed payload, and counts how many times it was called. */
+    private static final class CountingConnector implements EvidenceSourceConnector {
+        private final EvidenceSource source;
+        private final EvidenceDomain supported;
+        private final Object payload;
+        private int calls;
+
+        CountingConnector(EvidenceSource source, EvidenceDomain supported, Object payload) {
+            this.source = source;
+            this.supported = supported;
+            this.payload = payload;
+        }
+
+        @Override public EvidenceSource source() { return source; }
+        @Override public boolean supports(EvidenceDomain domain) { return domain == supported; }
+
+        @Override
+        public Object fetch(EvidenceDomain domain, EvidenceQuery query) {
+            calls++;
+            return payload;
+        }
     }
 }
