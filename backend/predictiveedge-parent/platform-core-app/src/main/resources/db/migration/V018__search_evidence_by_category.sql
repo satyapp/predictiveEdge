@@ -2,6 +2,7 @@
 -- Flow: search criteria -> search result and all listed stocks -> user-selected stocks
 --       -> evidence and stage 1 AI analysis -> intraday list (STAGE_1) -> stage 2 pass (STAGE_2).
 -- Stage markers: search_result is STAGE_1; stage-keyed tables carry STAGE_1 or STAGE_2.
+-- A selection and an intraday-list item may reference a stock from any of the 19 categories.
 -- Retention is intentionally not defined here: no purge job exists yet.
 
 create schema if not exists market_intelligence;
@@ -23,6 +24,7 @@ create table market_intelligence.search_result (
     constraint chk_search_result_category check (category in ('TOP_GAINERS', 'TOP_LOSERS', 'MOST_ACTIVE_BY_VOLUME', 'MOST_ACTIVE_BY_VALUE', 'WEEK_52_HIGH', 'WEEK_52_LOW', 'NEAR_WEEK_52_HIGH', 'NEAR_WEEK_52_LOW', 'INTRADAY_SURGE', 'INTRADAY_FALL', 'GAP_UP', 'GAP_DOWN', 'UPPER_CIRCUIT', 'LOWER_CIRCUIT', 'VOLUME_GAINERS', 'FRESH_BREAKOUTS', 'NEAR_BREAKOUTS', 'TECHNICAL_CROSSOVERS', 'PRE_OPEN')),
     constraint chk_search_result_stage check (stage = 'STAGE_1'),
     constraint chk_search_result_count check (result_count >= 0),
+    constraint uq_search_result_category unique (search_id, category),
     constraint chk_search_result_criteria check (jsonb_typeof(criteria_json) = 'object')
 );
 
@@ -31,11 +33,14 @@ create index idx_search_result_user
 
 create table market_intelligence.selected_stock (
     selection_id uuid primary key,
-    search_id uuid not null references market_intelligence.search_result (search_id),
+    search_id uuid not null,
+    category varchar(64) not null,
     user_id uuid not null,
     symbol varchar(32) not null,
     stage varchar(16) not null,
     selected_at timestamptz not null,
+    constraint fk_selected_stock_search foreign key (search_id, category)
+        references market_intelligence.search_result (search_id, category),
     constraint uq_selected_stock_search_symbol unique (search_id, symbol),
     constraint chk_selected_stock_stage check (stage = 'STAGE_1'),
     constraint chk_selected_stock_symbol check (length(symbol) between 1 and 32)
@@ -88,8 +93,10 @@ create index idx_intraday_list_user
 create table market_intelligence.intraday_list_item (
     list_id uuid not null references market_intelligence.intraday_list (list_id),
     selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    symbol varchar(32) not null,
     stage varchar(16) not null,
     primary key (list_id, selection_id),
+    constraint uq_intraday_list_item_symbol unique (list_id, symbol),
     constraint fk_intraday_list_item_analysis foreign key (selection_id, stage)
         references market_intelligence.selected_stock_ai_analysis (selection_id, stage),
     constraint chk_intraday_list_item_stage check (stage in ('STAGE_1', 'STAGE_2'))
