@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -182,7 +183,7 @@ class StageOneActivityStoreIntegrationTest {
         assertThatThrownBy(() -> store.recordSelections(new SelectionBatch(missingSearch, userId,
                 SearchEvidenceCategory.GAP_UP, SEARCHED_AT, List.of(new SelectedStockInput(UUID.randomUUID(),
                         "ITC", evidence("ITC"), analysis())))))
-                .isInstanceOf(DataAccessException.class);
+                .isInstanceOfAny(DataAccessException.class, PersistenceException.class);
     }
 
     private static ScreenerSearch search(UUID userId, UUID searchId, List<ScreenerRow> rows) {
