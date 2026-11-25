@@ -53,6 +53,8 @@ public final class IntelligenceSourcePlan {
         routes.put(HISTORICAL_AND_PREDICTIVE, List.of(route(HISTORICAL_AND_PREDICTIVE, FYERS, PRIMARY, 1),
                 route(HISTORICAL_AND_PREDICTIVE, ZERODHA, PRIMARY, 2),
                 route(HISTORICAL_AND_PREDICTIVE, TRENDLYNE, SUPPLEMENTARY, 3)));
+        routes.put(MARKET_DEPTH, List.of(route(MARKET_DEPTH, FYERS, PRIMARY, 1)));
+        routes.put(PRE_OPEN_ANALYSIS, List.of(route(PRE_OPEN_ANALYSIS, FYERS, PRIMARY, 1)));
         return Map.copyOf(routes);
     }
 

@@ -35,6 +35,16 @@ class IntelligenceSourcePlanTest {
     }
 
     @Test
+    void marketDepthAndPreOpenUseFyersAsTheOnlySource() {
+        for (EvidenceDomain domain : new EvidenceDomain[] {EvidenceDomain.MARKET_DEPTH,
+                EvidenceDomain.PRE_OPEN_ANALYSIS}) {
+            assertThat(IntelligenceSourcePlan.routesFor(domain))
+                    .extracting(EvidenceRoute::source, EvidenceRoute::role)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple(EvidenceSource.FYERS, SourceRole.PRIMARY));
+        }
+    }
+
+    @Test
     void fyersIsTheFirstRouteForEveryDomainItCanSupply() {
         assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DATA))
                 .extracting(EvidenceRoute::source)

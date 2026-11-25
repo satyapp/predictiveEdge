@@ -2,7 +2,10 @@ package org.predictiveedge.intelligence.connector;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import org.predictiveedge.trendlyne.mcp.TrendlyneMcpGateway;
 
 public final class TrendlyneEvidenceConnector implements EvidenceSourceConnector {
@@ -31,9 +34,12 @@ public final class TrendlyneEvidenceConnector implements EvidenceSourceConnector
         return SUPPORTED.contains(domain);
     }
 
+    /** Trendlyne reports plan and request errors as a successful call whose text says {@code "status": "error"}. */
+    private static final Pattern ERROR_STATUS = Pattern.compile("\"status\"\\s*:\\s*\"error\"");
+
     @Override
     public Object fetch(EvidenceDomain domain, EvidenceQuery query) {
-        return switch (domain) {
+        return usable(switch (domain) {
             case MARKET_DATA, HISTORICAL_AND_PREDICTIVE -> gateway.callTool("get_stock_eod_ohlc",
                     Map.of("stock_code", query.symbol(), "period", query.attribute("trendlynePeriod", "monthly")));
             case TECHNICAL_ANALYSIS -> overview(query, "technical");
@@ -45,11 +51,28 @@ public final class TrendlyneEvidenceConnector implements EvidenceSourceConnector
                     Map.of("stock_code", query.symbol(),
                             "type", query.attribute("trendlyneOwnershipType", "shareholding")));
             default -> throw new IllegalArgumentException("Unsupported Trendlyne domain: " + domain);
-        };
+        });
     }
 
-    private Object overview(EvidenceQuery query, String type) {
+    private CallToolResult overview(EvidenceQuery query, String type) {
         return gateway.callTool("get_overview_news_corp_events",
                 Map.of("stock_code", query.symbol(), "type", type));
+    }
+
+    /** Plan or request errors are unavailable, not evidence, so the source chain continues. */
+    private static CallToolResult usable(CallToolResult result) {
+        if (result == null) return null;
+        if (Boolean.TRUE.equals(result.isError()) || hasErrorStatus(result)) {
+            throw new EvidenceUnavailableException("Trendlyne did not return data for this request or plan");
+        }
+        return result;
+    }
+
+    private static boolean hasErrorStatus(CallToolResult result) {
+        for (var content : result.content()) {
+            if (content instanceof TextContent text && text.text() != null
+                    && ERROR_STATUS.matcher(text.text()).find()) return true;
+        }
+        return result.structuredContent() != null && ERROR_STATUS.matcher(result.structuredContent().toString()).find();
     }
 }
