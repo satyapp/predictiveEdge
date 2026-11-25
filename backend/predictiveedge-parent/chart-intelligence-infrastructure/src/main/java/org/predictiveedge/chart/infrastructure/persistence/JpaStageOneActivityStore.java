@@ -132,14 +132,9 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             readObject(stock.analysis().analysisJson(), "Analysis JSON");
         }
         transactions.executeWithoutResult(status -> {
-            List<SelectedStock> selections = new ArrayList<>();
-            for (SelectedStockInput stock : batch.stocks()) {
-                if (selectedStocks.existsBySearchIdAndSymbol(batch.searchId(), stock.symbol()))
-                    throw new IllegalStateException(stock.symbol() + " was already selected for this search");
-                selections.add(new SelectedStock(stock.selectionId(), batch.searchId(), batch.category().name(),
-                        batch.userId(), stock.symbol(), STAGE_1, batch.selectedAt()));
-            }
-            selectedStocks.saveAllAndFlush(selections);
+            saveSelections(batch.searchId(), batch.userId(), batch.category(), batch.selectedAt(),
+                    batch.stocks().stream().map(stock -> new StockSelection(stock.selectionId(), stock.symbol()))
+                            .toList());
             for (SelectedStockInput stock : batch.stocks()) {
                 JsonNode evidenceByDomain = readObject(stock.evidenceByDomainJson(), "Evidence JSON");
                 evidenceByDomain.fields().forEachRemaining(entry -> saveEvidence(
@@ -149,6 +144,23 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
                         analysis.stance(), analysis.thesis(), analysis.confirmation(), analysis.risk(),
                         analysis.model(), analysis.analysisJson(), analysis.generatedAt()));
             }
+        });
+    }
+
+    @Override
+    public void recordSelectedStocks(SelectionStart start) {
+        transactions.executeWithoutResult(status -> saveSelections(start.searchId(), start.userId(),
+                start.category(), start.selectedAt(), start.stocks()));
+    }
+
+    @Override
+    public void recordEvidence(EvidenceSave evidence) {
+        EvidenceDomain domain = domain(evidence.domain());
+        JsonNode items = readArray(evidence.evidenceJson(), "Evidence JSON");
+        transactions.executeWithoutResult(status -> {
+            if (!selectedStocks.existsById(evidence.selectionId()))
+                throw new IllegalArgumentException("Selection must be recorded before its evidence");
+            saveEvidence(evidence.selectionId(), domain, items);
         });
     }
 
@@ -177,6 +189,18 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
                     list.savedAt()));
             intradayListItems.saveAll(items);
         });
+    }
+
+    private void saveSelections(UUID searchId, UUID userId, SearchEvidenceCategory category, Instant selectedAt,
+            List<StockSelection> stocks) {
+        List<SelectedStock> selections = new ArrayList<>();
+        for (StockSelection stock : stocks) {
+            if (selectedStocks.existsBySearchIdAndSymbol(searchId, stock.symbol()))
+                throw new IllegalStateException(stock.symbol() + " was already selected for this search");
+            selections.add(new SelectedStock(stock.selectionId(), searchId, category.name(), userId,
+                    stock.symbol(), STAGE_1, selectedAt));
+        }
+        selectedStocks.saveAllAndFlush(selections);
     }
 
     private void saveScreenerRows(SearchEvidenceCategory category, UUID searchId, Instant createdAt,
@@ -250,6 +274,16 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             return EvidenceDomain.valueOf(value);
         } catch (IllegalArgumentException unknown) {
             throw new IllegalArgumentException("Unknown evidence domain " + value, unknown);
+        }
+    }
+
+    private JsonNode readArray(String value, String label) {
+        try {
+            JsonNode node = json.readTree(value);
+            if (node == null || !node.isArray()) throw new IllegalArgumentException(label + " must be a JSON array");
+            return node;
+        } catch (JsonProcessingException failure) {
+            throw new IllegalArgumentException(label + " is not valid JSON", failure);
         }
     }
 

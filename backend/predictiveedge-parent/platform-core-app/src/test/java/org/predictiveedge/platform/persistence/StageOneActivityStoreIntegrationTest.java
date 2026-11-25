@@ -18,8 +18,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.predictiveedge.chart.application.SearchEvidenceCategory;
 import org.predictiveedge.chart.application.StageOneActivityStore;
+import org.predictiveedge.chart.application.StageOneActivityStore.EvidenceSave;
 import org.predictiveedge.chart.application.StageOneActivityStore.IntradayListSave;
 import org.predictiveedge.chart.application.StageOneActivityStore.ScreenerRow;
+import org.predictiveedge.chart.application.StageOneActivityStore.SelectionStart;
+import org.predictiveedge.chart.application.StageOneActivityStore.StockSelection;
 import org.predictiveedge.chart.application.StageOneActivityStore.ScreenerSearch;
 import org.predictiveedge.chart.application.StageOneActivityStore.SelectedStockInput;
 import org.predictiveedge.chart.application.StageOneActivityStore.SelectionBatch;
@@ -184,6 +187,34 @@ class StageOneActivityStoreIntegrationTest {
                 SearchEvidenceCategory.GAP_UP, SEARCHED_AT, List.of(new SelectedStockInput(UUID.randomUUID(),
                         "ITC", evidence("ITC"), analysis())))))
                 .isInstanceOfAny(DataAccessException.class, PersistenceException.class);
+    }
+
+    @Test
+    void recordsSelectedStocksBeforeEachDataTypeAndRejectsEvidenceWithoutASelection() {
+        UUID userId = UUID.randomUUID();
+        UUID searchId = UUID.randomUUID();
+        UUID selection = UUID.randomUUID();
+        store.recordSearch(search(userId, searchId, List.of(new ScreenerRow("sbin", 1, "{}"))));
+        store.recordSelectedStocks(new SelectionStart(searchId, userId, SearchEvidenceCategory.TOP_GAINERS,
+                SEARCHED_AT, List.of(new StockSelection(selection, "sbin"))));
+        store.recordEvidence(new EvidenceSave(selection, "MARKET_DATA", """
+                [{"domain": "MARKET_DATA", "source": "NSE", "role": "PRIMARY", "status": "SUCCESS",
+                  "fetched_at": "2026-11-25T03:46:00Z", "payload": {"lastPrice": 812.4}, "detail": ""}]
+                """));
+        store.recordEvidence(new EvidenceSave(selection, "TECHNICAL_ANALYSIS", "[]"));
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from market_intelligence.selected_stock where selection_id = ? and stage = 'STAGE_1'",
+                Integer.class, selection)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "select payload->>'lastPrice' from market_intelligence.selected_stock_evidence_market_data"
+                        + " where selection_id = ? and source = 'NSE'", String.class, selection)).isEqualTo("812.4");
+        assertThat(jdbc.queryForObject(
+                "select count(*) from market_intelligence.selected_stock_ai_analysis where selection_id = ?",
+                Integer.class, selection)).isZero();
+        assertThatThrownBy(() -> store.recordEvidence(new EvidenceSave(UUID.randomUUID(), "MARKET_DATA", "[]")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be recorded");
     }
 
     private static ScreenerSearch search(UUID userId, UUID searchId, List<ScreenerRow> rows) {
