@@ -12,8 +12,14 @@ public enum SearchEvidenceCategory {
     VOLUME_GAINERS, FRESH_BREAKOUTS, NEAR_BREAKOUTS, TECHNICAL_CROSSOVERS,
     PRE_OPEN;
 
-    public String tableName() {
-        return "chart_intelligence.search_evidence_" + name().toLowerCase(Locale.ROOT);
+    /** L1 table: every screener row returned by a search in this category. */
+    public String searchResultTable() {
+        return "search_result_" + name().toLowerCase(Locale.ROOT);
+    }
+
+    /** L2 and L4 table: evidence for each AI-analysed selection in this category. */
+    public String stageEvidenceTable() {
+        return "stage_evidence_" + name().toLowerCase(Locale.ROOT);
     }
 
     public static Optional<SearchEvidenceCategory> fromCode(String code) {
