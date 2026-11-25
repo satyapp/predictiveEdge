@@ -1,20 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-predictiveedge}
-      POSTGRES_USER: ${POSTGRES_USER:-predictiveedge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-predictiveedge-local}
-    ports:
-      - "5432:5432"
-    volumes:
-      - predictiveedge-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-predictiveedge-local}", "--appendonly", "yes"]
@@ -63,7 +47,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.platform-core
     environment:
-      PE_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-predictiveedge}
+      PE_DATABASE_URL: jdbc:postgresql://host.docker.internal:5432/${POSTGRES_DB:-predictiveedge}
       PE_DATABASE_USERNAME: ${POSTGRES_USER:-predictiveedge}
       PE_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-predictiveedge-local}
       PE_REDIS_HOST: redis
@@ -128,9 +112,9 @@ services:
       PE_NSE_MCP_REQUEST_TIMEOUT: ${PE_NSE_MCP_REQUEST_TIMEOUT:-PT30S}
       JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
       
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -150,6 +134,5 @@ services:
       - "${WEB_PORT:-3000}:80"
 
 volumes:
-  predictiveedge-postgres-data:
   predictiveedge-redis-data:
   predictiveedge-kafka-data:
