@@ -31,35 +31,38 @@ create table market_intelligence.search_result (
 create index idx_search_result_user
     on market_intelligence.search_result (user_id, searched_at desc);
 
-create table market_intelligence.selected_stock (
+create table market_intelligence.searched_stock (
     selection_id uuid primary key,
     search_id uuid not null,
     category varchar(64) not null,
+    input_type varchar(64) not null,
+    universe varchar(64) not null,
+    duration varchar(64) not null,
     user_id uuid not null,
     symbol varchar(32) not null,
     stage varchar(16) not null,
     selected_at timestamptz not null,
-    constraint fk_selected_stock_search foreign key (search_id, category)
+    constraint fk_searched_stock_search foreign key (search_id, category)
         references market_intelligence.search_result (search_id, category),
-    constraint uq_selected_stock_search_symbol unique (search_id, symbol),
-    constraint chk_selected_stock_stage check (stage = 'STAGE_1'),
-    constraint chk_selected_stock_symbol check (length(symbol) between 1 and 32)
+    constraint uq_searched_stock_search_symbol unique (search_id, symbol),
+    constraint chk_searched_stock_stage check (stage = 'STAGE_1'),
+    constraint chk_searched_stock_symbol check (length(symbol) between 1 and 32)
 );
 
-create table market_intelligence.selected_stock_evidence (
-    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+create table market_intelligence.searched_stock_evidence (
+    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
     stage varchar(16) not null,
     evidence_by_domain jsonb not null,
     intelligence_modules jsonb not null,
     fetched_at timestamptz not null,
     primary key (selection_id, stage),
-    constraint chk_selected_stock_evidence_stage check (stage in ('STAGE_1', 'STAGE_2')),
-    constraint chk_selected_stock_evidence_domains check (jsonb_typeof(evidence_by_domain) = 'object'),
-    constraint chk_selected_stock_evidence_modules check (jsonb_typeof(intelligence_modules) = 'array')
+    constraint chk_searched_stock_evidence_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_searched_stock_evidence_domains check (jsonb_typeof(evidence_by_domain) = 'object'),
+    constraint chk_searched_stock_evidence_modules check (jsonb_typeof(intelligence_modules) = 'array')
 );
 
-create table market_intelligence.selected_stock_ai_analysis (
-    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+create table market_intelligence.searched_stock_ai_analysis (
+    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
     stage varchar(16) not null,
     stance varchar(32) not null,
     thesis text not null,
@@ -69,8 +72,8 @@ create table market_intelligence.selected_stock_ai_analysis (
     analysis_json jsonb not null,
     generated_at timestamptz not null,
     primary key (selection_id, stage),
-    constraint chk_selected_stock_ai_stage check (stage in ('STAGE_1', 'STAGE_2')),
-    constraint chk_selected_stock_ai_json check (jsonb_typeof(analysis_json) = 'object')
+    constraint chk_searched_stock_ai_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_searched_stock_ai_json check (jsonb_typeof(analysis_json) = 'object')
 );
 
 create table market_intelligence.intraday_list (
@@ -92,13 +95,13 @@ create index idx_intraday_list_user
 
 create table market_intelligence.intraday_list_item (
     list_id uuid not null references market_intelligence.intraday_list (list_id),
-    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
     symbol varchar(32) not null,
     stage varchar(16) not null,
     primary key (list_id, selection_id),
     constraint uq_intraday_list_item_symbol unique (list_id, symbol),
     constraint fk_intraday_list_item_analysis foreign key (selection_id, stage)
-        references market_intelligence.selected_stock_ai_analysis (selection_id, stage),
+        references market_intelligence.searched_stock_ai_analysis (selection_id, stage),
     constraint chk_intraday_list_item_stage check (stage in ('STAGE_1', 'STAGE_2'))
 );
 
