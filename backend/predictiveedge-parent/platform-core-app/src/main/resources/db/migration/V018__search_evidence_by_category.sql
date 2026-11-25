@@ -31,38 +31,199 @@ create table market_intelligence.search_result (
 create index idx_search_result_user
     on market_intelligence.search_result (user_id, searched_at desc);
 
-create table market_intelligence.searched_stock (
+create table market_intelligence.selected_stock (
     selection_id uuid primary key,
     search_id uuid not null,
     category varchar(64) not null,
-    input_type varchar(64) not null,
-    universe varchar(64) not null,
-    duration varchar(64) not null,
     user_id uuid not null,
     symbol varchar(32) not null,
     stage varchar(16) not null,
     selected_at timestamptz not null,
-    constraint fk_searched_stock_search foreign key (search_id, category)
+    constraint fk_selected_stock_search foreign key (search_id, category)
         references market_intelligence.search_result (search_id, category),
-    constraint uq_searched_stock_search_symbol unique (search_id, symbol),
-    constraint chk_searched_stock_stage check (stage = 'STAGE_1'),
-    constraint chk_searched_stock_symbol check (length(symbol) between 1 and 32)
+    constraint uq_selected_stock_search_symbol unique (search_id, symbol),
+    constraint chk_selected_stock_stage check (stage = 'STAGE_1'),
+    constraint chk_selected_stock_symbol check (length(symbol) between 1 and 32)
 );
 
-create table market_intelligence.searched_stock_evidence (
-    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
+-- Evidence fetched for MARKET_DATA, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_market_data (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
     stage varchar(16) not null,
-    evidence_by_domain jsonb not null,
-    intelligence_modules jsonb not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
     fetched_at timestamptz not null,
-    primary key (selection_id, stage),
-    constraint chk_searched_stock_evidence_stage check (stage in ('STAGE_1', 'STAGE_2')),
-    constraint chk_searched_stock_evidence_domains check (jsonb_typeof(evidence_by_domain) = 'object'),
-    constraint chk_searched_stock_evidence_modules check (jsonb_typeof(intelligence_modules) = 'array')
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_market_data_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_market_data_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_market_data_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
 );
 
-create table market_intelligence.searched_stock_ai_analysis (
-    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
+-- Evidence fetched for TECHNICAL_ANALYSIS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_technical_analysis (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_technical_analysis_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_technical_analysis_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_technical_analysis_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for CHART_PATTERNS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_chart_patterns (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_chart_patterns_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_chart_patterns_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_chart_patterns_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for FUNDAMENTAL_ANALYSIS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_fundamental_analysis (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_fundamental_analysis_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_fundamental_analysis_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_fundamental_analysis_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for NEWS_AND_SENTIMENT, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_news_and_sentiment (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_news_and_sentiment_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_news_and_sentiment_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_news_and_sentiment_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for CORPORATE_ACTIONS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_corporate_actions (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_corporate_actions_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_corporate_actions_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_corporate_actions_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for MACRO_AND_ECONOMIC, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_macro_and_economic (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_macro_and_economic_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_macro_and_economic_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_macro_and_economic_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for INSTITUTIONAL_FLOWS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_institutional_flows (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_institutional_flows_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_institutional_flows_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_institutional_flows_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for HISTORICAL_AND_PREDICTIVE, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_historical_and_predictive (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_historical_and_predictive_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_historical_and_predictive_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_historical_and_predictive_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for MARKET_DEPTH, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_market_depth (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_market_depth_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_market_depth_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_market_depth_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+-- Evidence fetched for PRE_OPEN_ANALYSIS, one row per selection, stage and source.
+create table market_intelligence.selected_stock_evidence_pre_open_analysis (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
+    stage varchar(16) not null,
+    source varchar(32) not null,
+    role varchar(32) not null,
+    status varchar(32) not null,
+    fetched_at timestamptz not null,
+    payload jsonb,
+    detail text,
+    primary key (selection_id, stage, source),
+    constraint chk_selected_stock_evidence_pre_open_analysis_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_evidence_pre_open_analysis_source check (source in ('FYERS', 'NSE', 'ZERODHA', 'TRENDLYNE', 'RAW_DATA_ENGINE', 'PATTERN_DETECTION_ENGINE', 'COINDESK', 'YAHOO_FINANCE')),
+    constraint chk_selected_stock_evidence_pre_open_analysis_status check (status in ('SUCCESS', 'UNAVAILABLE', 'UNSUPPORTED', 'FAILED', 'SKIPPED'))
+);
+
+create table market_intelligence.selected_stock_ai_analysis (
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
     stage varchar(16) not null,
     stance varchar(32) not null,
     thesis text not null,
@@ -72,8 +233,8 @@ create table market_intelligence.searched_stock_ai_analysis (
     analysis_json jsonb not null,
     generated_at timestamptz not null,
     primary key (selection_id, stage),
-    constraint chk_searched_stock_ai_stage check (stage in ('STAGE_1', 'STAGE_2')),
-    constraint chk_searched_stock_ai_json check (jsonb_typeof(analysis_json) = 'object')
+    constraint chk_selected_stock_ai_stage check (stage in ('STAGE_1', 'STAGE_2')),
+    constraint chk_selected_stock_ai_json check (jsonb_typeof(analysis_json) = 'object')
 );
 
 create table market_intelligence.intraday_list (
@@ -95,13 +256,13 @@ create index idx_intraday_list_user
 
 create table market_intelligence.intraday_list_item (
     list_id uuid not null references market_intelligence.intraday_list (list_id),
-    selection_id uuid not null references market_intelligence.searched_stock (selection_id),
+    selection_id uuid not null references market_intelligence.selected_stock (selection_id),
     symbol varchar(32) not null,
     stage varchar(16) not null,
     primary key (list_id, selection_id),
     constraint uq_intraday_list_item_symbol unique (list_id, symbol),
     constraint fk_intraday_list_item_analysis foreign key (selection_id, stage)
-        references market_intelligence.searched_stock_ai_analysis (selection_id, stage),
+        references market_intelligence.selected_stock_ai_analysis (selection_id, stage),
     constraint chk_intraday_list_item_stage check (stage in ('STAGE_1', 'STAGE_2'))
 );
 
