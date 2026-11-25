@@ -32,8 +32,9 @@ public final class IntelligenceSourcePlan {
 
     private static Map<EvidenceDomain, List<EvidenceRoute>> routes() {
         var routes = new EnumMap<EvidenceDomain, List<EvidenceRoute>>(EvidenceDomain.class);
-        routes.put(MARKET_DATA, List.of(route(MARKET_DATA, NSE, PRIMARY, 1),
-                route(MARKET_DATA, ZERODHA, PRIMARY, 2), route(MARKET_DATA, TRENDLYNE, SUPPLEMENTARY, 3)));
+        routes.put(MARKET_DATA, List.of(route(MARKET_DATA, FYERS, PRIMARY, 1),
+                route(MARKET_DATA, NSE, PRIMARY, 2), route(MARKET_DATA, ZERODHA, PRIMARY, 3),
+                route(MARKET_DATA, TRENDLYNE, SUPPLEMENTARY, 4)));
         routes.put(TECHNICAL_ANALYSIS, List.of(route(TECHNICAL_ANALYSIS, RAW_DATA_ENGINE, DERIVED, 1),
                 route(TECHNICAL_ANALYSIS, TRENDLYNE, SUPPLEMENTARY, 2)));
         routes.put(CHART_PATTERNS, List.of(route(CHART_PATTERNS, PATTERN_DETECTION_ENGINE, DERIVED, 1),
@@ -49,8 +50,9 @@ public final class IntelligenceSourcePlan {
                 route(MACRO_AND_ECONOMIC, TRENDLYNE, SUPPLEMENTARY, 3)));
         routes.put(INSTITUTIONAL_FLOWS, List.of(route(INSTITUTIONAL_FLOWS, NSE, PRIMARY, 1),
                 route(INSTITUTIONAL_FLOWS, TRENDLYNE, SUPPLEMENTARY, 2)));
-        routes.put(HISTORICAL_AND_PREDICTIVE, List.of(route(HISTORICAL_AND_PREDICTIVE, ZERODHA, PRIMARY, 1),
-                route(HISTORICAL_AND_PREDICTIVE, TRENDLYNE, SUPPLEMENTARY, 2)));
+        routes.put(HISTORICAL_AND_PREDICTIVE, List.of(route(HISTORICAL_AND_PREDICTIVE, FYERS, PRIMARY, 1),
+                route(HISTORICAL_AND_PREDICTIVE, ZERODHA, PRIMARY, 2),
+                route(HISTORICAL_AND_PREDICTIVE, TRENDLYNE, SUPPLEMENTARY, 3)));
         return Map.copyOf(routes);
     }
 

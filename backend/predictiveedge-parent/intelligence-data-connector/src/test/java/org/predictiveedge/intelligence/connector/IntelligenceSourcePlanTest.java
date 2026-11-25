@@ -31,7 +31,22 @@ class IntelligenceSourcePlanTest {
                         org.assertj.core.groups.Tuple.tuple(EvidenceSource.TRENDLYNE, SourceRole.SUPPLEMENTARY));
         assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.HISTORICAL_AND_PREDICTIVE))
                 .extracting(EvidenceRoute::source)
-                .containsExactly(EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+    }
+
+    @Test
+    void fyersIsTheFirstRouteForEveryDomainItCanSupply() {
+        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DATA))
+                .extracting(EvidenceRoute::source)
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.NSE, EvidenceSource.ZERODHA,
+                        EvidenceSource.TRENDLYNE);
+        for (EvidenceDomain domain : EvidenceDomain.values()) {
+            var routes = IntelligenceSourcePlan.routesFor(domain);
+            boolean listed = routes.stream().anyMatch(route -> route.source() == EvidenceSource.FYERS);
+            if (listed) assertThat(routes.getFirst().source()).isEqualTo(EvidenceSource.FYERS);
+        }
+        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MACRO_AND_ECONOMIC))
+                .extracting(EvidenceRoute::source).doesNotContain(EvidenceSource.FYERS);
     }
 
     @Test
