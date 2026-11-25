@@ -2,6 +2,7 @@ package org.predictiveedge.intelligence.connector;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
@@ -25,14 +26,30 @@ public final class CompositeIntelligenceDataConnector implements IntelligenceDat
         this.connectors = Map.copyOf(indexed);
     }
 
+    /**
+     * Walks the domain's source plan in priority order. A source is called only while no earlier source has
+     * returned usable evidence for this domain and symbol; later sources are recorded as {@code SKIPPED} so the
+     * result still lists the full plan and shows which source supplied the data.
+     */
     @Override
     public List<ProviderEvidence> fetch(EvidenceDomain domain, EvidenceQuery query) {
         Objects.requireNonNull(domain, "Evidence domain is required");
         Objects.requireNonNull(query, "Evidence query is required");
-        return IntelligenceSourcePlan.routesFor(domain).stream()
+        var results = new ArrayList<ProviderEvidence>();
+        boolean satisfied = false;
+        for (EvidenceRoute route : IntelligenceSourcePlan.routesFor(domain).stream()
                 .sorted(Comparator.comparingInt(EvidenceRoute::priority))
-                .map(route -> fetch(route, query))
-                .toList();
+                .toList()) {
+            if (satisfied) {
+                results.add(result(route, EvidenceFetchStatus.SKIPPED, null,
+                        "Not called: an earlier source returned usable evidence"));
+                continue;
+            }
+            ProviderEvidence attempt = fetch(route, query);
+            results.add(attempt);
+            satisfied = attempt.status() == EvidenceFetchStatus.SUCCESS;
+        }
+        return List.copyOf(results);
     }
 
     @Override
@@ -55,7 +72,9 @@ public final class CompositeIntelligenceDataConnector implements IntelligenceDat
         }
         try {
             Object payload = connector.fetch(route.domain(), query);
-            if (payload == null) return result(route, EvidenceFetchStatus.UNAVAILABLE, null, "No evidence returned");
+            if (payload == null || isEmptyCollection(payload)) {
+                return result(route, EvidenceFetchStatus.UNAVAILABLE, null, "No evidence returned");
+            }
             return result(route, EvidenceFetchStatus.SUCCESS, payload, "");
         } catch (EvidenceUnavailableException unavailable) {
             return result(route, EvidenceFetchStatus.UNAVAILABLE, null, unavailable.getMessage());
@@ -63,6 +82,10 @@ public final class CompositeIntelligenceDataConnector implements IntelligenceDat
             return result(route, EvidenceFetchStatus.FAILED, null,
                     "Connector failure: " + failure.getClass().getSimpleName());
         }
+    }
+
+    private static boolean isEmptyCollection(Object payload) {
+        return payload instanceof Collection<?> collection && collection.isEmpty();
     }
 
     private ProviderEvidence result(
