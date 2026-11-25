@@ -2,6 +2,7 @@ package org.predictiveedge.intelligence.connector;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Set;
 import org.predictiveedge.broker.spi.HistoricalMarketDataProvider;
 import org.predictiveedge.nse.mcp.NseMcpGateway;
 import org.predictiveedge.trendlyne.mcp.TrendlyneMcpGateway;
@@ -26,15 +27,20 @@ public class IntelligenceConnectorConfiguration {
      * injection would send Zerodha routes to FYERS and make a second, duplicate call.
      */
     @Bean @ConditionalOnBean(HistoricalMarketDataProvider.class)
-    ZerodhaEvidenceConnector zerodhaEvidenceConnector(
+    HistoricalCandleEvidenceConnector zerodhaEvidenceConnector(
             @Qualifier("zerodhaHistoricalDataProvider") ObjectProvider<HistoricalMarketDataProvider> history) {
-        return new ZerodhaEvidenceConnector(history.getIfAvailable());
+        return new HistoricalCandleEvidenceConnector(EvidenceSource.ZERODHA,
+                Set.of(EvidenceDomain.MARKET_DATA, EvidenceDomain.MACRO_AND_ECONOMIC,
+                        EvidenceDomain.HISTORICAL_AND_PREDICTIVE),
+                history.getIfAvailable());
     }
 
     @Bean
-    FyersEvidenceConnector fyersEvidenceConnector(
+    HistoricalCandleEvidenceConnector fyersEvidenceConnector(
             @Qualifier("fyersHistoricalDataProvider") ObjectProvider<HistoricalMarketDataProvider> history) {
-        return new FyersEvidenceConnector(history.getIfAvailable());
+        return new HistoricalCandleEvidenceConnector(EvidenceSource.FYERS,
+                Set.of(EvidenceDomain.MARKET_DATA, EvidenceDomain.HISTORICAL_AND_PREDICTIVE),
+                history.getIfAvailable());
     }
 
     @Bean
