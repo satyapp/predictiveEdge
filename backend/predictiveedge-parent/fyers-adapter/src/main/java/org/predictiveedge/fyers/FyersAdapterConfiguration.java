@@ -9,7 +9,6 @@ import org.predictiveedge.broker.connection.CredentialCipher;
 import org.predictiveedge.chart.application.LiveMarketScreenSource;
 import org.predictiveedge.broker.spi.HistoricalMarketDataProvider;
 import org.predictiveedge.broker.spi.LiveMarketDataInstrumentResolver;
-import org.predictiveedge.intelligence.connector.EvidenceSourceConnector;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -48,9 +47,5 @@ public class FyersAdapterConfiguration {
             FyersHttpClient client, ObjectMapper json,
             @Qualifier("nseMcpLiveMarketScreenSource") Optional<LiveMarketScreenSource> fallback) {
         return new FyersLiveMarketScreenSource(connections, client, json, Clock.systemUTC(), fallback.orElse(null));
-    }
-    @Bean EvidenceSourceConnector fyersEvidenceConnector(FyersConnectionService connections,
-            FyersHttpClient client) {
-        return new FyersEvidenceConnector(connections, client);
     }
 }

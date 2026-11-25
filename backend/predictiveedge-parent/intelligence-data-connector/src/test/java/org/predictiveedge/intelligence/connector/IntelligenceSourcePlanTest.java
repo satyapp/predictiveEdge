@@ -32,12 +32,31 @@ class IntelligenceSourcePlanTest {
         assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.HISTORICAL_AND_PREDICTIVE))
                 .extracting(EvidenceRoute::source)
                 .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+    }
+
+    @Test
+    void marketDepthAndPreOpenUseFyersAsTheOnlySource() {
+        for (EvidenceDomain domain : new EvidenceDomain[] {EvidenceDomain.MARKET_DEPTH,
+                EvidenceDomain.PRE_OPEN_ANALYSIS}) {
+            assertThat(IntelligenceSourcePlan.routesFor(domain))
+                    .extracting(EvidenceRoute::source, EvidenceRoute::role)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple(EvidenceSource.FYERS, SourceRole.PRIMARY));
+        }
+    }
+
+    @Test
+    void fyersIsTheFirstRouteForEveryDomainItCanSupply() {
         assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DATA))
                 .extracting(EvidenceRoute::source)
-                .startsWith(EvidenceSource.FYERS, EvidenceSource.ZERODHA);
-        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DEPTH))
-                .extracting(EvidenceRoute::source)
-                .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA);
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.NSE, EvidenceSource.ZERODHA,
+                        EvidenceSource.TRENDLYNE);
+        for (EvidenceDomain domain : EvidenceDomain.values()) {
+            var routes = IntelligenceSourcePlan.routesFor(domain);
+            boolean listed = routes.stream().anyMatch(route -> route.source() == EvidenceSource.FYERS);
+            if (listed) assertThat(routes.getFirst().source()).isEqualTo(EvidenceSource.FYERS);
+        }
+        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MACRO_AND_ECONOMIC))
+                .extracting(EvidenceRoute::source).doesNotContain(EvidenceSource.FYERS);
     }
 
     @Test
