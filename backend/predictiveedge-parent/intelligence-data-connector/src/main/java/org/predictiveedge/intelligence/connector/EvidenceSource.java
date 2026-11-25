@@ -1,6 +1,7 @@
 package org.predictiveedge.intelligence.connector;
 
 public enum EvidenceSource {
+    FYERS,
     NSE,
     ZERODHA,
     TRENDLYNE,

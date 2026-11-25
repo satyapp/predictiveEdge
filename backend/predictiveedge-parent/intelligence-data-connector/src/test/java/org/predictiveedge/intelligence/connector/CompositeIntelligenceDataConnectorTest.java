@@ -16,17 +16,18 @@ class CompositeIntelligenceDataConnectorTest {
 
     @Test
     void fetchesConfiguredSourcesAndReportsMissingSourcesWithoutSilentFallback() {
-        EvidenceSourceConnector nse = connector(EvidenceSource.NSE, EvidenceDomain.MARKET_DATA, "nse-quote");
-        var service = new CompositeIntelligenceDataConnector(List.of(nse), Clock.fixed(NOW, ZoneOffset.UTC));
+        EvidenceSourceConnector fyers = connector(EvidenceSource.FYERS, EvidenceDomain.MARKET_DATA, "fyers-quote");
+        var service = new CompositeIntelligenceDataConnector(List.of(fyers), Clock.fixed(NOW, ZoneOffset.UTC));
 
         var evidence = service.fetch(EvidenceDomain.MARKET_DATA, QUERY);
 
         assertThat(evidence).extracting(ProviderEvidence::source)
-                .containsExactly(EvidenceSource.NSE, EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA,
+                        EvidenceSource.NSE, EvidenceSource.TRENDLYNE);
         assertThat(evidence).extracting(ProviderEvidence::status)
                 .containsExactly(EvidenceFetchStatus.SUCCESS, EvidenceFetchStatus.UNAVAILABLE,
-                        EvidenceFetchStatus.UNAVAILABLE);
-        assertThat(evidence.getFirst().payload()).isEqualTo("nse-quote");
+                        EvidenceFetchStatus.UNAVAILABLE, EvidenceFetchStatus.UNAVAILABLE);
+        assertThat(evidence.getFirst().payload()).isEqualTo("fyers-quote");
     }
 
     @Test
@@ -54,7 +55,7 @@ class CompositeIntelligenceDataConnectorTest {
     @Test
     void convertsConnectorExceptionsIntoFailedEvidence() {
         EvidenceSourceConnector failing = new EvidenceSourceConnector() {
-            @Override public EvidenceSource source() { return EvidenceSource.NSE; }
+            @Override public EvidenceSource source() { return EvidenceSource.FYERS; }
             @Override public boolean supports(EvidenceDomain domain) { return true; }
             @Override public Object fetch(EvidenceDomain domain, EvidenceQuery query) {
                 throw new IllegalStateException("sensitive upstream detail");

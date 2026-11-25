@@ -43,6 +43,10 @@ final class FyersHttpClient {
     JsonNode history(String authorization, Map<String, String> parameters) {
         return get(uri(DATA.resolve("history"), parameters), authorization);
     }
+    JsonNode depth(String authorization, String symbol) {
+        return get(uri(DATA.resolve("depth"), Map.of("symbol", symbol, "ohlcv_flag", "1")), authorization);
+    }
+    JsonNode marketStatus(String authorization) { return get(DATA.resolve("marketStatus"), authorization); }
     JsonNode publicJson(URI uri) {
         return get(uri, null);
     }

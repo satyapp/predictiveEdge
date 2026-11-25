@@ -14,8 +14,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
@@ -52,8 +55,9 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
     }
 
     @Override
-    public StageOneAiResult analyze(MarketScreenHistoricalAnalysisService.Result result) {
-        String evidenceJson = write(compact(result));
+    public StageOneAiResult analyze(UUID userId, String brokerAccountId,
+            MarketScreenHistoricalAnalysisService.Result result) {
+        String evidenceJson = write(compact(result, BrokerContext.withoutCredentials(userId, brokerAccountId)));
         Map<String, String> expected = new LinkedHashMap<>();
         result.ranking().candidates().forEach(value -> expected.put(value.symbol(), "INSUFFICIENT_EVIDENCE"));
         result.analyses().forEach(value -> expected.put(value.assessment().symbol(), stance(value.assessment().action())));
@@ -77,18 +81,8 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             if (response.statusCode() < 200 || response.statusCode() >= 300)
                 throw new IllegalStateException("Ollama returned HTTP " + response.statusCode());
             JsonNode content = json.readTree(required(json.readTree(response.body()).path("message").path("content").asText(null), "Ollama content"));
-            var candidates = new ArrayList<PreOpenOllamaAnalysis.CandidateInterpretation>();
-            Map<String, String> returned = new LinkedHashMap<>();
-            for (JsonNode value : content.path("candidates")) {
-                var candidate = new PreOpenOllamaAnalysis.CandidateInterpretation(value.path("symbol").asText(),
-                        value.path("stance").asText(), value.path("thesis").asText(),
-                        value.path("confirmation").asText(), value.path("risk").asText());
-                if (returned.put(candidate.symbol(), candidate.stance()) != null)
-                    throw new IllegalStateException("Ollama duplicated candidate " + candidate.symbol());
-                candidates.add(candidate);
-            }
-            if (!returned.equals(expected)) throw new IllegalStateException("Ollama changed deterministic symbols or directions");
             var cautions = new ArrayList<String>(); content.path("cautions").forEach(value -> cautions.add(value.asText()));
+            var candidates = reconcileCandidates(content, expected, cautions);
             var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
                     content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
             return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
@@ -97,7 +91,55 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
         } catch (IOException failure) { throw new IllegalStateException("Ollama analysis is unavailable", failure); }
     }
 
-    private ObjectNode compact(MarketScreenHistoricalAnalysisService.Result result) {
+    /** Keeps deterministic identity and direction authoritative without discarding useful model explanations. */
+    static List<PreOpenOllamaAnalysis.CandidateInterpretation> reconcileCandidates(
+            JsonNode content, Map<String, String> expected, List<String> cautions) {
+        Map<String, PreOpenOllamaAnalysis.CandidateInterpretation> accepted = new LinkedHashMap<>();
+        for (JsonNode value : content.path("candidates")) {
+            String rawSymbol = value.path("symbol").asText();
+            String symbol = normalizeSymbol(rawSymbol);
+            if (!expected.containsKey(symbol)) {
+                cautions.add("Ollama returned unknown symbol " + rawSymbol + "; it was ignored.");
+                continue;
+            }
+            if (accepted.containsKey(symbol)) {
+                cautions.add("Ollama duplicated " + symbol + "; only the first explanation was retained.");
+                continue;
+            }
+            String deterministicStance = expected.get(symbol);
+            String proposedStance = value.path("stance").asText().trim().toUpperCase(Locale.ROOT);
+            if (!deterministicStance.equals(proposedStance)) {
+                cautions.add("Ollama proposed " + proposedStance + " for " + symbol
+                        + "; deterministic stance " + deterministicStance + " was retained.");
+            }
+            accepted.put(symbol, new PreOpenOllamaAnalysis.CandidateInterpretation(symbol,
+                    deterministicStance, value.path("thesis").asText(),
+                    value.path("confirmation").asText(), value.path("risk").asText()));
+        }
+        var reconciled = new ArrayList<PreOpenOllamaAnalysis.CandidateInterpretation>();
+        expected.forEach((symbol, stance) -> {
+            var candidate = accepted.get(symbol);
+            if (candidate != null) {
+                reconciled.add(candidate);
+                return;
+            }
+            cautions.add("Ollama omitted " + symbol + "; a deterministic-only row was retained.");
+            reconciled.add(new PreOpenOllamaAnalysis.CandidateInterpretation(symbol, stance,
+                    "Ollama returned no explanation for this stock; only deterministic screening evidence is available.",
+                    "Review the deterministic confirmation rule before taking any action.",
+                    "AI interpretation is missing; treat this row as incomplete evidence."));
+        });
+        return List.copyOf(reconciled);
+    }
+
+    private static String normalizeSymbol(String value) {
+        String symbol = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (symbol.startsWith("NSE:")) symbol = symbol.substring(4);
+        if (symbol.endsWith("-EQ")) symbol = symbol.substring(0, symbol.length() - 3);
+        return symbol;
+    }
+
+    private ObjectNode compact(MarketScreenHistoricalAnalysisService.Result result, BrokerContext brokerContext) {
         ObjectNode root = json.createObjectNode(); root.put("authority", result.authority());
         root.put("screen_type", result.screenType().name()); root.put("ranking_score_version", result.ranking().scoreVersion());
         Map<String, org.predictiveedge.chart.domain.MarketScreenTechnicalAssessment> assessments = result.analyses()
@@ -129,7 +171,8 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
         root.set("intelligence_evidence", intelligence.collect(
-                result.ranking().candidates().stream().map(value -> value.symbol()).toList(), result.analyzedAt()));
+                result.ranking().candidates().stream().map(value -> value.symbol()).toList(),
+                result.analyzedAt(), brokerContext));
         return root;
     }
 

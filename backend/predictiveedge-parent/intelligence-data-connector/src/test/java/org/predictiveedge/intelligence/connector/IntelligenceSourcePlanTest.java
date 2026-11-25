@@ -31,7 +31,13 @@ class IntelligenceSourcePlanTest {
                         org.assertj.core.groups.Tuple.tuple(EvidenceSource.TRENDLYNE, SourceRole.SUPPLEMENTARY));
         assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.HISTORICAL_AND_PREDICTIVE))
                 .extracting(EvidenceRoute::source)
-                .containsExactly(EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA, EvidenceSource.TRENDLYNE);
+        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DATA))
+                .extracting(EvidenceRoute::source)
+                .startsWith(EvidenceSource.FYERS, EvidenceSource.ZERODHA);
+        assertThat(IntelligenceSourcePlan.routesFor(EvidenceDomain.MARKET_DEPTH))
+                .extracting(EvidenceRoute::source)
+                .containsExactly(EvidenceSource.FYERS, EvidenceSource.ZERODHA);
     }
 
     @Test

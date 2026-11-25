@@ -3,6 +3,8 @@ package org.predictiveedge.intelligence.connector;
 /** The nine external/derived evidence domains that feed the twelve decision resources. */
 public enum EvidenceDomain {
     MARKET_DATA,
+    MARKET_DEPTH,
+    PRE_OPEN_ANALYSIS,
     TECHNICAL_ANALYSIS,
     CHART_PATTERNS,
     FUNDAMENTAL_ANALYSIS,

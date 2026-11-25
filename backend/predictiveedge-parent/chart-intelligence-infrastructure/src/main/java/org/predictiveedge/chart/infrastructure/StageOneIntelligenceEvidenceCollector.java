@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import org.predictiveedge.decision.domain.DecisionResourceType;
+import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
 import org.predictiveedge.intelligence.connector.EvidenceFetchStatus;
 import org.predictiveedge.intelligence.connector.EvidenceQuery;
@@ -30,6 +31,10 @@ final class StageOneIntelligenceEvidenceCollector {
     }
 
     ObjectNode collect(Collection<String> symbols, Instant cutoff) {
+        return collect(symbols, cutoff, null);
+    }
+
+    ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext) {
         ObjectNode root = json.createObjectNode();
         root.put("schema_version", SCHEMA_VERSION);
         root.put("evidence_cutoff", cutoff.toString());
@@ -37,18 +42,19 @@ final class StageOneIntelligenceEvidenceCollector {
         ArrayNode requiredModules = root.putArray("required_modules");
         for (DecisionResourceType resource : DecisionResourceType.values()) requiredModules.add(resource.name());
         ArrayNode stocks = root.putArray("stocks");
-        for (String symbol : new LinkedHashSet<>(symbols)) stocks.add(stock(symbol, cutoff));
+        for (String symbol : new LinkedHashSet<>(symbols)) stocks.add(stock(symbol, cutoff, brokerContext));
         return root;
     }
 
-    private ObjectNode stock(String symbol, Instant cutoff) {
+    private ObjectNode stock(String symbol, Instant cutoff, BrokerContext brokerContext) {
         ObjectNode stock = json.createObjectNode();
         stock.put("symbol", symbol);
         ObjectNode evidenceByDomain = stock.putObject("evidence_by_domain");
         Map<EvidenceDomain, ArrayNode> evidence = new EnumMap<>(EvidenceDomain.class);
         for (EvidenceDomain domain : EvidenceDomain.values()) {
             ArrayNode values = evidenceByDomain.putArray(domain.name());
-            connector.fetch(domain, EvidenceQuery.forSymbol(symbol, query(domain, symbol), cutoff))
+            connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff,
+                            brokerContext, null, Map.of()))
                     .forEach(value -> values.add(provider(value)));
             evidence.put(domain, values);
         }
@@ -97,6 +103,8 @@ final class StageOneIntelligenceEvidenceCollector {
         return switch (domain) {
             case TECHNICAL_ANALYSIS -> "technical analysis for " + symbol;
             case FUNDAMENTAL_ANALYSIS -> "SWOT strengths weaknesses opportunities threats for " + symbol;
+            case MARKET_DEPTH -> "live bid ask market depth for " + symbol;
+            case PRE_OPEN_ANALYSIS -> "current pre-open market state for " + symbol;
             default -> domain.name().replace('_', ' ').toLowerCase(java.util.Locale.ROOT) + " for " + symbol;
         };
     }

@@ -89,7 +89,7 @@ public class MarketScreenCsvAnalysisController {
             var deterministic = historical.analyze(new MarketScreenHistoricalAnalysisService.Command(
                     identity.user().id(), brokerAccountId, screenType, csv, tradingDate, observedAt,
                     analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
-            var stageOne = ollama.analyze(deterministic);
+            var stageOne = ollama.analyze(identity.user().id(), brokerAccountId, deterministic);
             var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),
                     stageOne.goldenCopy());
             history.record(identity.user().id(), screenType.name(), "MARKET_SCREEN_FULL", file.getOriginalFilename(),

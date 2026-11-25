@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant Ollama as OllamaPreOpenAnalysisAdapter (line 161)
+    participant SOC as StageOneIntelligenceEvidenceCollector
+    participant CMP as CompositeIntelligenceDataConnector
+    participant NSE as NseEvidenceConnector
+    participant ZER as ZerodhaEvidenceConnector
+    participant TL as TrendlyneEvidenceConnector
+    participant DER as DerivedEvidenceConnector (not registered)
+
+    Ollama->>SOC: collect(symbols, cutoff)
+    loop each symbol, then each of the nine domains
+        SOC->>CMP: fetch(domain, forSymbol with null brokerContext)
+        Note over CMP: every route runs in priority order, no early stop, one thread
+        alt MARKET_DATA
+            CMP->>NSE: route 1, cm_get_stock_quote
+            CMP->>ZER: route 2, no brokerContext, returns UNAVAILABLE without calling Zerodha
+            CMP->>TL: route 3, get_stock_eod_ohlc
+        else TECHNICAL_ANALYSIS
+            CMP->>DER: route 1, RAW_DATA_ENGINE, no bean, UNAVAILABLE
+            CMP->>TL: route 2, overview technical
+        else CHART_PATTERNS
+            CMP->>DER: route 1, PATTERN_DETECTION_ENGINE, no bean, UNAVAILABLE
+            CMP->>DER: route 2, RAW_DATA_ENGINE, no bean, UNAVAILABLE
+        else FUNDAMENTAL_ANALYSIS
+            CMP->>TL: route 1, get_parameter_values_multi_stock only
+        else NEWS_AND_SENTIMENT
+            CMP->>NSE: route 1, NSE does not support this domain, UNSUPPORTED
+            CMP->>TL: route 2, overview news
+        else MACRO_AND_ECONOMIC
+            CMP->>NSE: route 1, get_index_snapshot
+            CMP->>ZER: route 2, UNAVAILABLE (no brokerContext)
+            CMP->>TL: route 3, Trendlyne does not support this domain, UNSUPPORTED
+        end
+        CMP-->>SOC: List of ProviderEvidence with status per route
+    end
+    SOC-->>Ollama: evidence envelope, golden copy frozen, not stored

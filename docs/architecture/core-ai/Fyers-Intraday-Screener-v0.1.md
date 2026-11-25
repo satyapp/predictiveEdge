@@ -2,7 +2,10 @@
 
 ## Decision
 
-PredictiveEdge will use FYERS API v3 as the primary intraday discovery provider for the Nifty 500 universe. The existing NSE MCP adapter remains intact as a resilience source; it is not removed, silently substituted, or treated as guaranteed live data.
+PredictiveEdge will use FYERS API v3 as the primary intraday discovery and broker market-data provider for the Nifty 500 universe. Zerodha remains a supported broker adapter. The existing NSE MCP adapter remains intact as an exchange-data resilience source; it is not removed, silently substituted, or treated as guaranteed live data. Trendlyne is supplementary and is used only for capabilities verified through its configured API/MCP tools.
+
+The per-stock payload required before Stage-1 AI is defined in
+[`Stock-Stage-One-Evidence-Contract-v0.1.md`](./Stock-Stage-One-Evidence-Contract-v0.1.md).
 
 Only the intake path changes. Every accepted provider payload must be normalized into the existing `MarketScreenDataCopy` before deterministic ranking, historical analysis, Ollama analysis, golden-copy persistence, and optional second-level analysis run.
 

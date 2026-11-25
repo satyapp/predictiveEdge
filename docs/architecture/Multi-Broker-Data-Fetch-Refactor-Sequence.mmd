@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    participant Caller as Run caller
+    participant Coord as EvidenceFetchCoordinator
+    participant Pool as Virtual-thread pool
+    participant Zer as Zerodha (broker)
+    participant NSE as NSE (MCP)
+    participant TL as Trendlyne (MCP)
+    participant Q as Bounded queue
+    participant W as Persistence writer
+    participant DB as PostgreSQL
+    participant Mod as Module assembly
+
+    Caller->>Coord: run(searchId, symbols, cutoff, brokerContext)
+    Coord->>Pool: submit one chain per (symbol, data type)
+
+    par MARKET_DATA chain for SYMBOL-A
+        Pool->>Zer: fetch quote and candles (permit + rate limit)
+        alt Zerodha returns usable data
+            Zer-->>Pool: SUCCESS, depth 1
+        else UNAVAILABLE, FAILED, empty, or 403 token
+            Zer-->>Pool: not usable, record attempt
+            Pool->>NSE: fallback to next route
+            alt NSE returns usable data
+                NSE-->>Pool: SUCCESS, depth 2
+            else NSE not usable
+                NSE-->>Pool: not usable, record attempt
+                Pool->>TL: fallback to supplementary route
+                TL-->>Pool: SUCCESS or NO_EVIDENCE
+            end
+        end
+        Pool->>Q: ChainResult with attempts[]
+    and TECHNICAL_ANALYSIS chain for SYMBOL-A
+        Pool->>Pool: raw-data engine on MARKET_DATA result (no broker call)
+        Pool->>Q: ChainResult
+    and MARKET_DEPTH chain for SYMBOL-B
+        Pool->>Zer: depth snapshot
+        Zer-->>Pool: SUCCESS or not usable
+        Pool->>NSE: fallback only if not usable
+        Pool->>Q: ChainResult
+    end
+
+    loop Batch drain
+        Q->>W: batch of ChainResults
+        W->>DB: INSERT ON CONFLICT DO NOTHING (search_id, symbol, data_type)
+    end
+
+    Coord->>Coord: wait for all chains or run deadline
+    Coord->>Mod: build module envelopes from ChainResults
+    Mod-->>Caller: 12 module envelopes with coverage and provenance

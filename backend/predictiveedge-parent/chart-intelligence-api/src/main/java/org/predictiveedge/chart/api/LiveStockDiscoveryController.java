@@ -55,7 +55,7 @@ public class LiveStockDiscoveryController {
     public Response analyze(@AuthenticationPrincipal AuthenticatedIdentity identity,
             @Valid @RequestBody Request request) {
         var live = service.analyze(command(identity, request));
-        var stageOne = ollama.analyze(live.deterministic());
+        var stageOne = ollama.analyze(identity.user().id(), request.brokerAccountId(), live.deterministic());
         var response = new Response("PRELIMINARY_NOT_FINAL", live.dataCopy(), live.deterministic(),
                 stageOne.analysis(), stageOne.goldenCopy());
         String mode = request.selectedSymbol().isBlank() ? "MARKET_SCREEN_FULL" : "CONSOLIDATED_LEVEL_ONE";
