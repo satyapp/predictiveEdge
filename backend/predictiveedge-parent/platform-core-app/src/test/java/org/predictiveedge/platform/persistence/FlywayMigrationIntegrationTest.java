@@ -1,6 +1,7 @@
 package org.predictiveedge.platform.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -9,6 +10,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Applies every migration to an empty PostgreSQL 16 database, so a broken migration fails the build. */
@@ -20,6 +22,9 @@ class FlywayMigrationIntegrationTest {
 
     @BeforeAll
     static void startDatabase() {
+        // Runs wherever Docker is available, including the backend CI job. The image build has no Docker,
+        // so the test is reported as skipped there instead of failing the release image.
+        assumeTrue(DockerClientFactory.instance().isDockerAvailable(), "Docker is required for the migration test");
         postgres = new PostgreSQLContainer<>("postgres:16-alpine");
         postgres.start();
     }
