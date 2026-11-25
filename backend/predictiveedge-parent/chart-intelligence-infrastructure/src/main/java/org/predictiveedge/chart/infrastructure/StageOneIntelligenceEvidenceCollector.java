@@ -4,11 +4,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
-import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.predictiveedge.decision.domain.DecisionResourceType;
 import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
@@ -18,16 +26,35 @@ import org.predictiveedge.intelligence.connector.IntelligenceDataConnector;
 import org.predictiveedge.intelligence.connector.IntelligenceSourcePlan;
 import org.predictiveedge.intelligence.connector.ProviderEvidence;
 
-/** Builds the complete twelve-module evidence envelope used by Stage-1 and preserved for Stage-2. */
+/**
+ * Builds the complete twelve-module evidence envelope used by Stage-1 and preserved for Stage-2.
+ *
+ * <p>Fetching is parallel. Each evidence domain (data type) has its own group of worker threads, and every
+ * (stock, domain) pair is fetched by exactly one worker. A worker hands its result to an {@link EvidenceWriter}
+ * before it finishes. When all domains for a stock have finished, a collator thread builds that stock's package.
+ * The envelope lists stocks in the order they were given.</p>
+ *
+ * <p>A failed fetch or write stops the run: the first failure is rethrown after the running work has settled.</p>
+ */
 final class StageOneIntelligenceEvidenceCollector {
     static final String SCHEMA_VERSION = "stage-one-golden-copy-v1";
+    static final int DEFAULT_WORKERS_PER_DATA_TYPE = 2;
+    static final int COLLATOR_THREADS = 2;
 
     private final IntelligenceDataConnector connector;
     private final ObjectMapper json;
+    private final int workersPerDataType;
 
     StageOneIntelligenceEvidenceCollector(IntelligenceDataConnector connector, ObjectMapper json) {
+        this(connector, json, DEFAULT_WORKERS_PER_DATA_TYPE);
+    }
+
+    StageOneIntelligenceEvidenceCollector(IntelligenceDataConnector connector, ObjectMapper json,
+            int workersPerDataType) {
         this.connector = Objects.requireNonNull(connector, "Intelligence data connector is required");
         this.json = Objects.requireNonNull(json, "Object mapper is required");
+        if (workersPerDataType < 1) throw new IllegalArgumentException("At least one worker per data type is required");
+        this.workersPerDataType = workersPerDataType;
     }
 
     ObjectNode collect(Collection<String> symbols, Instant cutoff) {
@@ -35,6 +62,14 @@ final class StageOneIntelligenceEvidenceCollector {
     }
 
     ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext) {
+        return collect(symbols, cutoff, brokerContext, EvidenceWriter.DISCARD);
+    }
+
+    /** Fetches every stock in parallel, passes each result to {@code writer}, and returns the collated envelope. */
+    ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext,
+            EvidenceWriter writer) {
+        Objects.requireNonNull(cutoff, "Evidence cutoff is required");
+        Objects.requireNonNull(writer, "Evidence writer is required");
         ObjectNode root = json.createObjectNode();
         root.put("schema_version", SCHEMA_VERSION);
         root.put("evidence_cutoff", cutoff.toString());
@@ -42,22 +77,82 @@ final class StageOneIntelligenceEvidenceCollector {
         ArrayNode requiredModules = root.putArray("required_modules");
         for (DecisionResourceType resource : DecisionResourceType.values()) requiredModules.add(resource.name());
         ArrayNode stocks = root.putArray("stocks");
-        for (String symbol : new LinkedHashSet<>(symbols)) stocks.add(stock(symbol, cutoff, brokerContext));
+        List<String> distinct = symbols.stream()
+                .map(symbol -> Objects.requireNonNull(symbol, "Symbol is required").trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        if (distinct.isEmpty()) return root;
+        writer.begin(distinct);
+        runParallel(distinct, cutoff, brokerContext, writer).forEach(stocks::add);
         return root;
     }
 
-    private ObjectNode stock(String symbol, Instant cutoff, BrokerContext brokerContext) {
+    private List<ObjectNode> runParallel(List<String> symbols, Instant cutoff, BrokerContext brokerContext,
+            EvidenceWriter writer) {
+        Map<EvidenceDomain, ExecutorService> groups = new EnumMap<>(EvidenceDomain.class);
+        ExecutorService collators = Executors.newFixedThreadPool(COLLATOR_THREADS, threads("stage1-collator"));
+        try {
+            for (EvidenceDomain domain : EvidenceDomain.values()) {
+                groups.put(domain, Executors.newFixedThreadPool(workersPerDataType,
+                        threads("stage1-fetch-" + domain.name())));
+            }
+            List<CompletableFuture<ObjectNode>> packages = new ArrayList<>();
+            for (String symbol : symbols) {
+                Map<EvidenceDomain, CompletableFuture<ArrayNode>> fetches = new EnumMap<>(EvidenceDomain.class);
+                for (EvidenceDomain domain : EvidenceDomain.values()) {
+                    fetches.put(domain, CompletableFuture.supplyAsync(
+                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, writer), groups.get(domain)));
+                }
+                packages.add(CompletableFuture.allOf(fetches.values().toArray(CompletableFuture[]::new))
+                        .thenApplyAsync(done -> stock(symbol, fetches), collators));
+            }
+            awaitAll(packages);
+            return packages.stream().map(CompletableFuture::join).toList();
+        } finally {
+            groups.values().forEach(ExecutorService::shutdownNow);
+            collators.shutdownNow();
+        }
+    }
+
+    private ArrayNode fetchAndWrite(String symbol, EvidenceDomain domain, Instant cutoff,
+            BrokerContext brokerContext, EvidenceWriter writer) {
+        ArrayNode values = json.createArrayNode();
+        connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff, brokerContext, null,
+                        Map.of()))
+                .forEach(value -> values.add(provider(value)));
+        writer.write(symbol, domain, values);
+        return values;
+    }
+
+    /** Waits for every future, then rethrows the first failure with its original type. */
+    private static void awaitAll(List<CompletableFuture<ObjectNode>> packages) {
+        try {
+            CompletableFuture.allOf(packages.toArray(CompletableFuture[]::new)).join();
+        } catch (CompletionException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            if (cause instanceof Error error) throw error;
+            throw new IllegalStateException("Stage-1 evidence collection failed", cause);
+        }
+    }
+
+    private static ThreadFactory threads(String prefix) {
+        AtomicInteger counter = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable, prefix + "-" + counter.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    private ObjectNode stock(String symbol, Map<EvidenceDomain, CompletableFuture<ArrayNode>> fetches) {
+        Map<EvidenceDomain, ArrayNode> evidence = new EnumMap<>(EvidenceDomain.class);
+        fetches.forEach((domain, fetch) -> evidence.put(domain, fetch.join()));
+
         ObjectNode stock = json.createObjectNode();
         stock.put("symbol", symbol);
         ObjectNode evidenceByDomain = stock.putObject("evidence_by_domain");
-        Map<EvidenceDomain, ArrayNode> evidence = new EnumMap<>(EvidenceDomain.class);
-        for (EvidenceDomain domain : EvidenceDomain.values()) {
-            ArrayNode values = evidenceByDomain.putArray(domain.name());
-            connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff,
-                            brokerContext, null, Map.of()))
-                    .forEach(value -> values.add(provider(value)));
-            evidence.put(domain, values);
-        }
+        for (EvidenceDomain domain : EvidenceDomain.values()) evidenceByDomain.set(domain.name(), evidence.get(domain));
 
         ArrayNode modules = stock.putArray("intelligence_modules");
         for (DecisionResourceType resource : DecisionResourceType.values()) {
@@ -105,7 +200,7 @@ final class StageOneIntelligenceEvidenceCollector {
             case FUNDAMENTAL_ANALYSIS -> "SWOT strengths weaknesses opportunities threats for " + symbol;
             case MARKET_DEPTH -> "live bid ask market depth for " + symbol;
             case PRE_OPEN_ANALYSIS -> "current pre-open market state for " + symbol;
-            default -> domain.name().replace('_', ' ').toLowerCase(java.util.Locale.ROOT) + " for " + symbol;
+            default -> domain.name().replace('_', ' ').toLowerCase(Locale.ROOT) + " for " + symbol;
         };
     }
 }

@@ -28,6 +28,49 @@ public interface StageOneActivityStore {
     /** Writes the intraday list. Every selection must belong to the user and already have Stage-1 analysis. */
     void recordIntradayList(IntradayListSave list);
 
+    /**
+     * Writes the selected stocks of one screener run without evidence or analysis. Evidence rows reference their
+     * selection, so this must run before {@link #recordEvidence} for those stocks.
+     */
+    void recordSelectedStocks(SelectionStart start);
+
+    /**
+     * Writes one data type's evidence for one selected stock. {@code evidenceJson} is the JSON array of that domain's
+     * provider evidence, as the collector produces it. The selection must already be recorded.
+     */
+    void recordEvidence(EvidenceSave evidence);
+
+    record SelectionStart(UUID searchId, UUID userId, SearchEvidenceCategory category, Instant selectedAt,
+            List<StockSelection> stocks) {
+        public SelectionStart {
+            Objects.requireNonNull(searchId, "Search id is required");
+            Objects.requireNonNull(userId, "User id is required");
+            Objects.requireNonNull(category, "Search category is required");
+            Objects.requireNonNull(selectedAt, "Selection time is required");
+            stocks = List.copyOf(Objects.requireNonNull(stocks, "Selected stocks are required"));
+            if (stocks.isEmpty()) throw new IllegalArgumentException("At least one stock must be selected");
+            requireDistinctSymbols(stocks.stream().map(StockSelection::symbol).toList(), "Selected stocks");
+            if (new HashSet<>(stocks.stream().map(StockSelection::selectionId).toList()).size() != stocks.size())
+                throw new IllegalArgumentException("Selection ids must be distinct");
+        }
+    }
+
+    record StockSelection(UUID selectionId, String symbol) {
+        public StockSelection {
+            Objects.requireNonNull(selectionId, "Selection id is required");
+            symbol = normalizedSymbol(symbol);
+        }
+    }
+
+    /** One data type's evidence for one selection. {@code domain} is the {@code EvidenceDomain} name. */
+    record EvidenceSave(UUID selectionId, String domain, String evidenceJson) {
+        public EvidenceSave {
+            Objects.requireNonNull(selectionId, "Selection id is required");
+            domain = required(domain, "Evidence domain");
+            evidenceJson = required(evidenceJson, "Evidence JSON");
+        }
+    }
+
     record ScreenerSearch(UUID searchId, UUID userId, SearchEvidenceCategory category, MarketScreenType screenType,
             String setup, String universe, String timeframe, LocalDate tradingDate, String brokerAccountId,
             String criteriaJson, Instant searchedAt, List<ScreenerRow> rows) {
