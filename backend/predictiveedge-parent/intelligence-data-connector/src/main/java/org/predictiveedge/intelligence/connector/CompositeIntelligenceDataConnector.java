@@ -4,26 +4,33 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import org.predictiveedge.decision.domain.DecisionResourceType;
 
 public final class CompositeIntelligenceDataConnector implements IntelligenceDataConnector {
-    private final Map<EvidenceSource, EvidenceSourceConnector> connectors;
+    private final List<EvidenceSourceConnector> connectors;
     private final Clock clock;
 
+    /**
+     * One source may have several connectors when each serves different domains (for example FYERS candles and
+     * FYERS market depth). Two connectors for the same source and domain are rejected at construction.
+     */
     public CompositeIntelligenceDataConnector(List<EvidenceSourceConnector> connectors, Clock clock) {
         Objects.requireNonNull(connectors, "Source connectors are required");
         this.clock = Objects.requireNonNull(clock, "Clock is required");
-        var indexed = new EnumMap<EvidenceSource, EvidenceSourceConnector>(EvidenceSource.class);
+        var seen = new HashSet<SourceDomain>();
         for (EvidenceSourceConnector connector : connectors) {
-            EvidenceSourceConnector duplicate = indexed.put(connector.source(), connector);
-            if (duplicate != null) throw new IllegalArgumentException("Duplicate connector for " + connector.source());
+            for (EvidenceDomain domain : EvidenceDomain.values()) {
+                if (connector.supports(domain) && !seen.add(new SourceDomain(connector.source(), domain))) {
+                    throw new IllegalArgumentException(
+                            "Duplicate connector for " + connector.source() + " " + domain);
+                }
+            }
         }
-        this.connectors = Map.copyOf(indexed);
+        this.connectors = List.copyOf(connectors);
     }
 
     /**
@@ -62,13 +69,13 @@ public final class CompositeIntelligenceDataConnector implements IntelligenceDat
     }
 
     private ProviderEvidence fetch(EvidenceRoute route, EvidenceQuery query) {
-        EvidenceSourceConnector connector = connectors.get(route.source());
+        EvidenceSourceConnector connector = connectorFor(route);
         if (connector == null) {
-            return result(route, EvidenceFetchStatus.UNAVAILABLE, null, "Connector is not configured");
-        }
-        if (!connector.supports(route.domain())) {
-            return result(route, EvidenceFetchStatus.UNSUPPORTED, null,
-                    "The source does not expose this evidence domain");
+            boolean configured = connectors.stream().anyMatch(candidate -> candidate.source() == route.source());
+            return configured
+                    ? result(route, EvidenceFetchStatus.UNSUPPORTED, null,
+                            "The source does not expose this evidence domain")
+                    : result(route, EvidenceFetchStatus.UNAVAILABLE, null, "Connector is not configured");
         }
         try {
             Object payload = connector.fetch(route.domain(), query);
@@ -83,6 +90,15 @@ public final class CompositeIntelligenceDataConnector implements IntelligenceDat
                     "Connector failure: " + failure.getClass().getSimpleName());
         }
     }
+
+    private EvidenceSourceConnector connectorFor(EvidenceRoute route) {
+        return connectors.stream()
+                .filter(candidate -> candidate.source() == route.source() && candidate.supports(route.domain()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private record SourceDomain(EvidenceSource source, EvidenceDomain domain) { }
 
     private static boolean isEmptyCollection(Object payload) {
         return payload instanceof Collection<?> collection && collection.isEmpty();

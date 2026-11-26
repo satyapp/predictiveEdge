@@ -1,6 +1,7 @@
 package org.predictiveedge.intelligence.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -70,6 +71,32 @@ class CompositeIntelligenceDataConnectorTest {
         assertThat(fyers.calls).isEqualTo(1);
         assertThat(nse.calls).isZero();
         assertThat(zerodha.calls).isZero();
+    }
+
+    @Test
+    void oneSourceCanServeDifferentDomainsThroughSeparateConnectors() {
+        var candles = new CountingConnector(EvidenceSource.FYERS, EvidenceDomain.MARKET_DATA, "fyers-candles");
+        var depth = new CountingConnector(EvidenceSource.FYERS, EvidenceDomain.MARKET_DEPTH, "fyers-depth");
+        var service = new CompositeIntelligenceDataConnector(List.of(candles, depth),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var evidence = service.fetch(EvidenceDomain.MARKET_DEPTH, QUERY);
+
+        assertThat(evidence.getFirst().status()).isEqualTo(EvidenceFetchStatus.SUCCESS);
+        assertThat(evidence.getFirst().payload()).isEqualTo("fyers-depth");
+        assertThat(depth.calls).isEqualTo(1);
+        assertThat(candles.calls).isZero();
+    }
+
+    @Test
+    void rejectsTwoConnectorsForTheSameSourceAndDomain() {
+        var first = new CountingConnector(EvidenceSource.FYERS, EvidenceDomain.MARKET_DATA, "first");
+        var second = new CountingConnector(EvidenceSource.FYERS, EvidenceDomain.MARKET_DATA, "second");
+
+        assertThatThrownBy(() -> new CompositeIntelligenceDataConnector(List.of(first, second),
+                Clock.fixed(NOW, ZoneOffset.UTC)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate connector for FYERS MARKET_DATA");
     }
 
     @Test

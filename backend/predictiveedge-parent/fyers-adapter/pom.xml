@@ -8,6 +8,7 @@
     <dependency><groupId>org.predictiveedge</groupId><artifactId>chart-intelligence-application</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>broker-connection-application</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.predictiveedge</groupId><artifactId>identity-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.predictiveedge</groupId><artifactId>intelligence-data-connector</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
