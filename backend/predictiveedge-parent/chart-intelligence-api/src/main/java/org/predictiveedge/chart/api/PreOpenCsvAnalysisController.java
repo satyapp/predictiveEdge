@@ -35,7 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/chart-intelligence/v1/pre-open-csv-analyses")
 @ConditionalOnBean(PreOpenCsvAnalysisService.class)
 public class PreOpenCsvAnalysisController {
-    private static final long MAXIMUM_FILE_BYTES = 2L * 1024 * 1024;
+    private static final long MAXIMUM_FILE_BYTES = 10L * 1024 * 1024;
     private final PreOpenCsvAnalysisService service;
     private final ScreenerRunRecorder runs;
     private final ObjectMapper json;
@@ -56,7 +56,7 @@ public class PreOpenCsvAnalysisController {
             @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Pre-open CSV file is required");
         if (file.getSize() > MAXIMUM_FILE_BYTES)
-            throw new IllegalArgumentException("Pre-open CSV file must not exceed 2 MB");
+            throw new IllegalArgumentException("Pre-open CSV file must not exceed 10 MB");
         try {
             String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
             var parsed = service.ingest(new PreOpenCsvAnalysisService.Command(identity.user().id(), brokerAccountId,
