@@ -21,19 +21,6 @@ export type SetupAssessment = {
   evidenceReferences: string[];
 };
 
-export type RankedPreOpenCandidate = {
-  rank: number;
-  venue: string;
-  symbol: string;
-  direction: 'GAINER' | 'LOSER';
-  rankingScore: number;
-  scoreBand: 'HIGH' | 'MEDIUM' | 'LOW';
-  action: 'BUY_CANDIDATE' | 'SELL_CANDIDATE';
-  setupType: string;
-  gapPercent: number;
-  reasons: string[];
-};
-
 export type HistoricalSetupAnalysis = {
   providerInstrumentId: string;
   historicalBars: number;
@@ -75,13 +62,6 @@ export type PreOpenAnalysisResponse = {
     shortlistedForHistory: number;
     analyses: HistoricalSetupAnalysis[];
     candidates: HistoricalSetupAnalysis[];
-    ranking: {
-      scoreVersion: string;
-      calibratedProbability: boolean;
-      evaluatedAssessments: number;
-      probableGainers: RankedPreOpenCandidate[];
-      probableLosers: RankedPreOpenCandidate[];
-    };
     failures: { venue: string; symbol: string; reason: string }[];
     rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   };

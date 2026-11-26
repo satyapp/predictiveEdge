@@ -40,17 +40,15 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
 
   const hasResult = Boolean(preOpenResult || screenResult);
   const selectedCategory = categories.find((value) => value.value === category)!;
-  // Pre-open is deterministic only: its ranked candidates come from the rule-based ranker, not from Ollama.
-  const preOpenRanked = preOpenResult ? [
-    ...preOpenResult.deterministic.ranking.probableGainers,
-    ...preOpenResult.deterministic.ranking.probableLosers,
-  ] : [];
-  const candidateCount = preOpenResult ? preOpenRanked.length : screenResult?.ollama.candidates.length ?? 0;
+  // Pre-open is deterministic only: its candidates are the rule-based setups from the Zerodha history check.
+  const preOpenCandidates = preOpenResult?.deterministic.candidates ?? [];
+  const candidateCount = preOpenResult ? preOpenCandidates.length : screenResult?.ollama.candidates.length ?? 0;
   const goldenCopy = screenResult?.goldenCopy;
   const screenFacts = useMemo(() => new Map(screenResult?.deterministic.analyses.map((value) => [value.assessment.symbol, value])), [screenResult]);
   const screenRankings = useMemo(() => new Map(screenResult?.deterministic.ranking.candidates.map((value) => [value.symbol, value])), [screenResult]);
-  const candidateSummaries: { rank: number; symbol: string; label: string; tone: string }[] = preOpenResult ? preOpenRanked.map((value) => ({
-    rank: value.rank, symbol: value.symbol, label: value.action.replace('_', ' '), tone: value.action === 'BUY_CANDIDATE' ? 'buy' : 'sell',
+  const candidateSummaries: { rank: number; symbol: string; label: string; tone: string }[] = preOpenResult ? preOpenCandidates.map((value, index) => ({
+    rank: index + 1, symbol: value.assessment.symbol, label: value.assessment.action.replace(/_/g, ' '),
+    tone: value.assessment.action === 'BUY_CANDIDATE' ? 'buy' : value.assessment.action === 'SELL_CANDIDATE' ? 'sell' : 'wait',
   })) : screenResult?.ollama.candidates.map((value, index) => ({
     rank: screenRankings.get(value.symbol)?.rank ?? index + 1, symbol: value.symbol, label: value.stance.replace('_', ' '),
     tone: value.stance === 'LONG_WATCH' ? 'buy' : value.stance === 'SHORT_WATCH' ? 'sell' : 'wait',
@@ -72,7 +70,10 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
     try {
       const detail = await loadAnalysisHistoryDetail(session.accessToken, run.runId);
       setCategory(detail.category as AnalysisCategory); setPreOpenResult(undefined); setScreenResult(undefined);
-      if (detail.resultKind === 'PRE_OPEN_FULL') setPreOpenResult(detail.result as PreOpenAnalysisResponse);
+      if (detail.resultKind === 'PRE_OPEN_FULL' || detail.resultKind === 'PRE_OPEN_DETERMINISTIC') {
+        if (!('deterministic' in detail.result)) throw new Error('This saved pre-open run predates the current format and cannot be reopened.');
+        setPreOpenResult(detail.result as PreOpenAnalysisResponse);
+      }
       else if (detail.resultKind === 'MARKET_SCREEN_FULL') setScreenResult(detail.result as MarketScreenAnalysisResponse);
       else throw new Error('This deterministic-only run does not contain the Stage‑1 recommendation report.');
       setTradingDate(detail.tradingDate); setView('ANALYZE'); setResultTab('STAGE_ONE'); setLoadedFromHistory(true);
@@ -118,8 +119,8 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       {historyError && <p className="error" role="alert">{historyError}</p>}
       {!historyBusy && historyItems.length === 0 && !historyError && <p className="empty-history">No saved analyses yet. The next completed run will appear here.</p>}
       <div className="history-list">{historyItems.map((run) => {
-        const dataOnly = run.resultKind === 'PRE_OPEN_DETERMINISTIC' || run.resultKind === 'MARKET_SCREEN';
-        return <button type="button" key={run.runId} onClick={() => openHistory(run)} disabled={historyBusy || dataOnly}><span><small>TRADING DATE</small><b>{run.tradingDate}</b></span><span><small>CATEGORY</small><b>{categories.find((value) => value.value === run.category)?.label ?? run.category.replaceAll('_', ' ')}</b></span><span><small>FILE</small><b>{run.fileName}</b></span><span><small>CANDIDATES</small><b>{run.candidateCount}</b></span><span><small>MODEL</small><b>{run.stageOneModel}</b></span><i>{dataOnly ? 'DATA ONLY' : 'OPEN ›'}</i></button>;
+        const dataOnly = run.resultKind === 'MARKET_SCREEN';
+        return <button type="button" key={run.runId} onClick={() => openHistory(run)} disabled={historyBusy || dataOnly}><span><small>TRADING DATE</small><b>{run.tradingDate}</b></span><span><small>CATEGORY</small><b>{categories.find((value) => value.value === run.category)?.label ?? run.category.replaceAll('_', ' ')}</b></span><span><small>FILE</small><b>{run.fileName}</b></span><span><small>CANDIDATES</small><b>{run.candidateCount}</b></span><span><small>MODEL</small><b>{run.stageOneModel === 'NONE' ? '—' : run.stageOneModel}</b></span><i>{dataOnly ? 'DATA ONLY' : 'OPEN ›'}</i></button>;
       })}</div>
     </div> : <>
       <form className="analysis-console" onSubmit={submit}>
@@ -152,7 +153,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       {hasResult && <div className="unified-report">
         <div className="report-heading"><div><h3>Analysis Result — Stage‑1 Report</h3><p>{selectedCategory.label} · {candidateCount} candidates{loadedFromHistory ? ' · opened from saved history' : ' · saved to history'}</p></div><span className="completed">✓ Completed</span><div className="model-flow"><b>Ollama · Stage‑1</b><span>+</span><b className="future">OpenAI · Stage‑2</b></div></div>
         <div className="report-tabs">
-          {(['CANDIDATES', 'STAGE_ONE', 'STAGE_TWO', 'COMPARE'] as ResultTab[]).map((tab) => <button type="button" key={tab} className={resultTab === tab ? 'active' : ''} disabled={(tab === 'STAGE_TWO' || tab === 'COMPARE') && true} onClick={() => setResultTab(tab)}>{tab === 'CANDIDATES' ? `Candidate List (${candidateCount})` : tab === 'STAGE_ONE' ? (preOpenResult ? 'Deterministic Ranking' : 'Ollama Analysis (Stage‑1)') : tab === 'STAGE_TWO' ? 'Combined Analysis (Stage‑2) · Planned' : 'Side-by-Side Compare · Planned'}</button>)}
+          {(['CANDIDATES', 'STAGE_ONE', 'STAGE_TWO', 'COMPARE'] as ResultTab[]).map((tab) => <button type="button" key={tab} className={resultTab === tab ? 'active' : ''} disabled={(tab === 'STAGE_TWO' || tab === 'COMPARE') && true} onClick={() => setResultTab(tab)}>{tab === 'CANDIDATES' ? `Candidate List (${candidateCount})` : tab === 'STAGE_ONE' ? (preOpenResult ? 'Historical Setups' : 'Ollama Analysis (Stage‑1)') : tab === 'STAGE_TWO' ? 'Combined Analysis (Stage‑2) · Planned' : 'Side-by-Side Compare · Planned'}</button>)}
         </div>
 
         {resultTab === 'CANDIDATES' && <div className="candidate-list-summary">{candidateSummaries.map((candidate) => <button type="button" key={candidate.symbol} onClick={() => setResultTab('STAGE_ONE')}><span>#{candidate.rank}</span><b>{candidate.symbol}</b><em className={candidate.tone}>{candidate.label}</em><i>›</i></button>)}</div>}
@@ -162,7 +163,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
           <div className="analysis-meta"><span><b>{preOpenResult?.deterministic.parsedSnapshots ?? screenResult?.deterministic.parsedRows}</b> usable rows</span><span><b>{preOpenResult?.deterministic.shortlistedForHistory ?? screenResult?.deterministic.analyses.length ?? 0}</b> Zerodha histories</span><span><b>{preOpenResult?.deterministic.failures.length ?? screenResult?.deterministic.failures.length ?? 0}</b> failures</span><span><b>{candidateCount}</b> recommendations</span>{goldenCopy && <span title={goldenCopy.sourceFingerprint}><b>12</b> modules · golden copy {goldenCopy.sourceFingerprint.slice(0, 10)}…</span>}</div>
           <div className="risk-controls"><div><small>ILLUSTRATIVE POSITION-SIZE INPUTS</small><b>Set the maximum loss budget before reviewing a setup</b><p>Margin, slippage, correlation and portfolio exposure remain outside this calculator.</p></div><label>Capital (₹)<input type="number" min="1" step="1000" value={capital} onChange={(event) => setCapital(Number(event.target.value))} /></label><label>Risk per trade (%)<input type="number" min="0.05" max="5" step="0.05" value={riskPercent} onChange={(event) => setRiskPercent(Number(event.target.value))} /></label></div>
           <div className="decision-list">
-            {preOpenRanked.map((value) => <div className="diagnostic-row" key={`${value.direction}:${value.symbol}`}><span>#{value.rank} {value.symbol}</span><span>{value.direction}</span><span>{value.setupType} · gap {value.gapPercent.toFixed(2)}% · score {value.rankingScore.toFixed(1)} · {value.reasons.join(' · ')}</span></div>)}
+            {preOpenCandidates.map((value) => <div className="diagnostic-row" key={value.assessment.symbol}><span>{value.assessment.symbol}</span><span>{value.assessment.action.replace(/_/g, ' ')}</span><span>{value.assessment.setupType.replace(/_/g, ' ')} · gap {value.assessment.gapPercent.toFixed(2)}% · {value.assessment.reasons.join(' · ')}</span></div>)}
             {screenResult?.ollama.candidates.map((candidate) => <MarketScreenDecisionCard key={candidate.symbol} candidate={candidate} facts={screenFacts.get(candidate.symbol)} ranking={screenRankings.get(candidate.symbol)} screenType={screenResult.deterministic.screenType} capital={capital} riskPercent={riskPercent} />)}
           </div>
           {preOpenResult && preOpenResult.deterministic.failures.length > 0 && <div className="failure-block"><b>Historical analysis failures</b>{preOpenResult.deterministic.failures.map((value) => <div className="diagnostic-row" key={`${value.venue}:${value.symbol}`}><span>{value.symbol}</span><span>FAILED</span><span>{value.reason}</span></div>)}</div>}

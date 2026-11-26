@@ -73,7 +73,7 @@ public class PreOpenCsvAnalysisController {
             var result = new Response("PRELIMINARY_NOT_FINAL", deterministic, run.searchId());
             history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_DETERMINISTIC", file.getOriginalFilename(),
                     csv, tradingDate, result.deterministic().candidates().size(),
-                    result.deterministic().ranking().scoreVersion(), result);
+                    "NONE", result);
             return result;
         } catch (IOException failure) {
             throw new IllegalArgumentException("Pre-open CSV file could not be read", failure);

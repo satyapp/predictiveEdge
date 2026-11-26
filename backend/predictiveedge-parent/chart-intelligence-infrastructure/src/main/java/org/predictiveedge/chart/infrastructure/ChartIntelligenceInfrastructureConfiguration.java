@@ -21,7 +21,6 @@ import org.predictiveedge.chart.application.IntradayListRecorder;
 import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.PreOpenIntradayAnalysisService;
-import org.predictiveedge.chart.domain.PreOpenCandidateRanker;
 import org.predictiveedge.chart.domain.MarketScreenCandidateRanker;
 import org.predictiveedge.chart.domain.MarketScreenTechnicalAnalyzer;
 import org.predictiveedge.chart.domain.PreOpenIntradayAnalyzer;
@@ -71,11 +70,6 @@ public class ChartIntelligenceInfrastructureConfiguration {
     @Bean
     PreOpenIntradayAnalyzer preOpenIntradayAnalyzer() {
         return new PreOpenIntradayAnalyzer(PreOpenIntradayAnalyzer.Policy.conservativeDefaults());
-    }
-
-    @Bean
-    PreOpenCandidateRanker preOpenCandidateRanker() {
-        return new PreOpenCandidateRanker();
     }
 
     @Bean
@@ -137,9 +131,8 @@ public class ChartIntelligenceInfrastructureConfiguration {
             LiveMarketDataInstrumentResolver instruments,
             HistoricalMarketDataProvider history,
             PreOpenAuctionPublicationPort publications,
-            PreOpenIntradayAnalyzer analyzer,
-            PreOpenCandidateRanker ranker) {
-        return new PreOpenCsvAnalysisService(parser, instruments, history, publications, analyzer, ranker,
+            PreOpenIntradayAnalyzer analyzer) {
+        return new PreOpenCsvAnalysisService(parser, instruments, history, publications, analyzer,
                 Clock.systemUTC());
     }
 
