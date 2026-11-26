@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.chart.application.IntradayListRecorder;
 import org.predictiveedge.chart.application.MarketScreenDataCopy;
-import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneActivityStore.StageOneAnalysisInput;
@@ -50,7 +49,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * comes from {@code PREDICTIVEEDGE_TEST_JDBC_URL}, {@code PREDICTIVEEDGE_TEST_JDBC_USER} and
  * {@code PREDICTIVEEDGE_TEST_JDBC_PASSWORD} when set, so it runs on a local server without Docker. Otherwise it starts
  * a PostgreSQL container and is skipped when Docker is unavailable. Hibernate validates every mapping against V001 to
- * V018.
+ * V020.
  */
 class StageOneRunPersistenceIntegrationTest {
     private static final Instant CUTOFF = Instant.parse("2026-11-25T04:10:00Z");
@@ -185,12 +184,12 @@ class StageOneRunPersistenceIntegrationTest {
     }
 
     @Test
-    void savesThePreOpenShortlistAndCollatesOnlyItsPreOpenData() throws Exception {
-        var json = new ObjectMapper().findAndRegisterModules();
+    void storesTheDaysPreOpenRowsWithEveryCsvColumnAndNoAnalysis() {
         UUID userId = UUID.randomUUID();
-        var shortlist = List.of(preOpen("SBIN", "800.00"), preOpen("TCS", "3900.00"));
-        var run = new ScreenerRunRecorder(store).recordPreOpen(userId, "broker-it", TRADING_DATE, shortlist,
-                "{\"historyDays\":365}", snapshot -> write(json, PreOpenEvidenceConnector.payload(snapshot)), CUTOFF);
+        var dayRows = List.of(preOpen("SBIN", "800.00"), preOpen("TCS", "3900.00"));
+        var run = new ScreenerRunRecorder(store).recordPreOpen(userId, "broker-it", TRADING_DATE, dayRows,
+                "{\"historyDays\":365}", snapshot -> write(new ObjectMapper(), Map.of("symbol", snapshot.symbol())),
+                CUTOFF);
 
         assertThat(count("select count(*) from market_intelligence.search_result where search_id = ? "
                 + "and category = 'PRE_OPEN' and screen_type = 'PRE_OPEN'", run.searchId())).isEqualTo(1);
@@ -200,33 +199,6 @@ class StageOneRunPersistenceIntegrationTest {
                 + "and prev_close is not null and best_bid_qty = 500 and best_ask_qty = 700 "
                 + "and indicative_equilibrium_qty = 900 and final_volume = 1000 and week_52_low is not null",
                 run.searchId())).isEqualTo(2);
-
-        var connector = new PreOpenEvidenceConnector(Map.of("SBIN", shortlist.get(0), "TCS", shortlist.get(1)));
-        var stage = new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), CUTOFF);
-        var envelope = new StageOneIntelligenceEvidenceCollector(connector, json, 2)
-                .collect(List.of("SBIN", "TCS"), CUTOFF, null, stage);
-
-        assertThat(count("select count(*) from market_intelligence.stock_evidence_pre_open e "
-                + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
-                + "where s.search_id = ? and e.source = 'NSE' and e.status = 'SUCCESS'", run.searchId()))
-                .isEqualTo(2);
-        assertThat(count("select count(*) from market_intelligence.selected_stock_evidence_market_data e "
-                + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
-                + "where s.search_id = ?", run.searchId())).isZero();
-        assertThat(envelope.at("/stocks/0/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/kind").asText())
-                .isEqualTo("PRE_OPEN_AUCTION_SNAPSHOT");
-        assertThat(envelope.at("/stocks/1/evidence_by_domain/MARKET_DATA")).isEmpty();
-
-        UUID sbin = stage.selectionIds().get("SBIN");
-        UUID tcs = stage.selectionIds().get("TCS");
-        stage.recordAnalyses(new PreOpenOllamaAnalysis("qwen3:8b", CUTOFF, true, "MIXED", "Two stocks",
-                List.of(new PreOpenOllamaAnalysis.CandidateInterpretation("SBIN", "LONG_WATCH", "Gap held",
-                                "Hold the auction price", "Stop below the open"),
-                        new PreOpenOllamaAnalysis.CandidateInterpretation("TCS", "WAIT", "Gap not confirmed",
-                                "Wait for volume", "Gap may fill")),
-                List.of()));
-        assertThat(count("select count(*) from market_intelligence.selected_stock_ai_analysis where selection_id in (?, ?)",
-                sbin, tcs)).isEqualTo(2);
     }
 
     @Test

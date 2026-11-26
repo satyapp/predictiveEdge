@@ -85,8 +85,7 @@ export type PreOpenAnalysisResponse = {
     failures: { venue: string; symbol: string; reason: string }[];
     rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   };
-  ollama: OllamaAnalysis;
-  goldenCopy: StageOneGoldenCopy;
+  searchId: string;
 };
 
 export async function analyzePreOpenCsv(input: {
@@ -105,7 +104,7 @@ export async function analyzePreOpenCsv(input: {
   form.set('historyDays', String(input.historyDays ?? 365));
   form.set('maximumCandidates', String(input.maximumCandidates ?? 10));
   form.set('file', input.file);
-  const response = await fetch('/api/chart-intelligence/v1/pre-open-csv-analyses/ollama', {
+  const response = await fetch('/api/chart-intelligence/v1/pre-open-csv-analyses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${input.accessToken}` },
     body: form,

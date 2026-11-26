@@ -152,21 +152,6 @@ public class ChartIntelligenceInfrastructureConfiguration {
     }
 
     @Bean
-    org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort preOpenOllamaAnalysisPort(
-            ObjectMapper json,
-            @Value("${predictiveedge.ai.ollama.model:qwen3:8b}") String model,
-            @Value("${predictiveedge.ai.ollama.endpoint:http://localhost:11434/api/chat}") URI endpoint,
-            @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
-            @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
-            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
-            StageOneGoldenCopyFactory goldenCopies, StageOneActivityStore store) {
-        Duration timeout = Duration.ofSeconds(timeoutSeconds);
-        return new OllamaPreOpenAnalysisAdapter(json,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), endpoint, model,
-                timeout, contextTokens, outputTokens, Clock.systemUTC(), goldenCopies, store);
-    }
-
-    @Bean
     org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort marketScreenOllamaAnalysisPort(
             ObjectMapper json,
             @Value("${predictiveedge.ai.ollama.model:qwen3:8b}") String model,

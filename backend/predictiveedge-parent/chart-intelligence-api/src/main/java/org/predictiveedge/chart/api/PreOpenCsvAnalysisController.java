@@ -1,5 +1,6 @@
 package org.predictiveedge.chart.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -9,16 +10,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
-import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
-import org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort;
-import org.predictiveedge.chart.application.ScreenerRunRecorder;
-import org.predictiveedge.chart.application.StageOneGoldenCopy;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.MediaType;
@@ -30,6 +26,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Deterministic pre-open analysis of an NSE pre-open CSV. The day's rows are stored as a PRE_OPEN run so that each
+ * stock can be given its pre-open row as evidence. Ollama does not read or rank the CSV.
+ */
 @Validated
 @RestController
 @RequestMapping("/api/chart-intelligence/v1/pre-open-csv-analyses")
@@ -37,22 +37,20 @@ import org.springframework.web.multipart.MultipartFile;
 public class PreOpenCsvAnalysisController {
     private static final long MAXIMUM_FILE_BYTES = 2L * 1024 * 1024;
     private final PreOpenCsvAnalysisService service;
-    private final PreOpenOllamaAnalysisPort ollama;
     private final AnalysisRunRecorder history;
     private final ScreenerRunRecorder runs;
     private final ObjectMapper json;
 
-    public PreOpenCsvAnalysisController(PreOpenCsvAnalysisService service, PreOpenOllamaAnalysisPort ollama,
-            AnalysisRunRecorder history, ScreenerRunRecorder runs, ObjectMapper json) {
+    public PreOpenCsvAnalysisController(PreOpenCsvAnalysisService service, AnalysisRunRecorder history,
+            ScreenerRunRecorder runs, ObjectMapper json) {
         this.service = service;
-        this.ollama = ollama;
         this.history = history;
         this.runs = runs;
         this.json = json;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public PreOpenCsvAnalysisService.Result analyze(
+    public Response analyze(
             @AuthenticationPrincipal AuthenticatedIdentity identity,
             @RequestParam @NotBlank String brokerAccountId,
             @RequestParam @NotNull LocalDate tradingDate,
@@ -66,42 +64,16 @@ public class PreOpenCsvAnalysisController {
             throw new IllegalArgumentException("Pre-open CSV file must not exceed 2 MB");
         try {
             String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
-            var result = service.analyze(new PreOpenCsvAnalysisService.Command(identity.user().id(), brokerAccountId,
-                    csv, tradingDate, observedAt, analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
-            history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_DETERMINISTIC", file.getOriginalFilename(),
-                    csv, tradingDate, result.candidates().size(), result.ranking().scoreVersion(), result);
-            return result;
-        } catch (IOException failure) {
-            throw new IllegalArgumentException("Pre-open CSV file could not be read", failure);
-        }
-    }
-
-    @PostMapping(path = "/ollama", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public OllamaResponse analyzeWithOllama(
-            @AuthenticationPrincipal AuthenticatedIdentity identity,
-            @RequestParam @NotBlank String brokerAccountId,
-            @RequestParam @NotNull LocalDate tradingDate,
-            @RequestParam @NotNull Instant observedAt,
-            @RequestParam @NotNull Instant analysisCutoff,
-            @RequestParam(defaultValue = "365") @Min(7) @Max(365) int historyDays,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(15) int maximumCandidates,
-            @RequestParam("file") MultipartFile file) {
-        if (file == null || file.isEmpty()) throw new IllegalArgumentException("Pre-open CSV file is required");
-        if (file.getSize() > MAXIMUM_FILE_BYTES)
-            throw new IllegalArgumentException("Pre-open CSV file must not exceed 2 MB");
-        try {
-            String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
             var deterministic = service.analyze(new PreOpenCsvAnalysisService.Command(identity.user().id(),
-                    brokerAccountId, csv, tradingDate, observedAt,
-                    analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
+                    brokerAccountId, csv, tradingDate, observedAt, analysisCutoff, Duration.ofDays(historyDays),
+                    maximumCandidates));
             var run = runs.recordPreOpen(identity.user().id(), brokerAccountId, tradingDate,
                     deterministic.dayRows(), criteria(brokerAccountId, tradingDate, historyDays, maximumCandidates),
                     this::serialize, deterministic.startedAt());
-            var stageOne = ollama.analyze(identity.user().id(), deterministic, run);
-            var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),
-                    stageOne.goldenCopy(), run.searchId());
-            history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_FULL", file.getOriginalFilename(), csv,
-                    tradingDate, result.ollama().candidates().size(), result.ollama().model(), result);
+            var result = new Response("PRELIMINARY_NOT_FINAL", deterministic, run.searchId());
+            history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_DETERMINISTIC", file.getOriginalFilename(),
+                    csv, tradingDate, result.deterministic().candidates().size(),
+                    result.deterministic().ranking().scoreVersion(), result);
             return result;
         } catch (IOException failure) {
             throw new IllegalArgumentException("Pre-open CSV file could not be read", failure);
@@ -120,11 +92,11 @@ public class PreOpenCsvAnalysisController {
     private String serialize(Object value) {
         try {
             return json.writeValueAsString(value);
-        } catch (JsonProcessingException failure) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
             throw new IllegalStateException("Pre-open run could not be persisted", failure);
         }
     }
 
-    public record OllamaResponse(String authority, PreOpenCsvAnalysisService.Result deterministic,
-            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy, UUID searchId) { }
+    /** The deterministic analysis of the day, and the id of the stored PRE_OPEN run that holds its rows. */
+    public record Response(String authority, PreOpenCsvAnalysisService.Result deterministic, UUID searchId) { }
 }
