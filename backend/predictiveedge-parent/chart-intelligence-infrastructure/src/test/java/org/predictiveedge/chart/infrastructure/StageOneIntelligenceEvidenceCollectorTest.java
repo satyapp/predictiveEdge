@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,6 +21,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.predictiveedge.broker.domain.Candle;
+import org.predictiveedge.broker.domain.Instrument;
 import org.predictiveedge.chart.application.SearchEvidenceCategory;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneActivityStore.StageOneAnalysisInput;
@@ -158,6 +162,30 @@ class StageOneIntelligenceEvidenceCollectorTest {
         assertThat(result.at("/stocks/0/evidence_by_domain/MARKET_DATA/0/source").asText()).isEqualTo("STORED_ROW");
         assertThat(result.at("/stocks/0/evidence_by_domain/MARKET_DATA/0/payload/from").asText())
                 .isEqualTo("database");
+    }
+
+    @Test
+    void reusesTheCandlesTheAnalysisLoadedInsteadOfCallingAnySourceForThoseDomains() {
+        var connector = new RecordingConnector(0);
+        var candles = List.of(new Candle(new Instrument("NSE", "INFY"), CUTOFF, BigDecimal.ONE, BigDecimal.ONE,
+                BigDecimal.ONE, BigDecimal.ONE, 10L, null));
+        var json = new ObjectMapper().registerModule(new JavaTimeModule());
+
+        var result = new StageOneIntelligenceEvidenceCollector(connector, json)
+                .collect(List.of("INFY", "TCS"), CUTOFF, null, new InMemoryEvidenceStage(), Map.of("INFY", candles));
+
+        assertThat(connector.calls).doesNotContainKeys("INFY:MARKET_DATA", "INFY:HISTORICAL_AND_PREDICTIVE");
+        assertThat(connector.calls).containsKeys("TCS:MARKET_DATA", "TCS:HISTORICAL_AND_PREDICTIVE");
+        assertThat(result.at("/stocks/0/symbol").asText()).isEqualTo("INFY");
+        for (String domain : List.of("MARKET_DATA", "HISTORICAL_AND_PREDICTIVE")) {
+            JsonNode rows = result.at("/stocks/0/evidence_by_domain/" + domain);
+            assertThat(rows.get(0).path("source").asText()).isEqualTo("FYERS");
+            assertThat(rows.get(0).path("status").asText()).isEqualTo("SUCCESS");
+            assertThat(rows.get(0).path("payload")).hasSize(1);
+            assertThat(rows.findValuesAsText("status")).first().isEqualTo("SUCCESS");
+            assertThat(rows.findValuesAsText("status").subList(1, rows.size())).containsOnly("SKIPPED");
+        }
+        assertThat(result.at("/stocks/1/evidence_by_domain/MARKET_DATA/0/source").asText()).isEqualTo("TRENDLYNE");
     }
 
     /** Writes nothing useful and returns a fixed row, so the test can tell whether collation reads the stage. */

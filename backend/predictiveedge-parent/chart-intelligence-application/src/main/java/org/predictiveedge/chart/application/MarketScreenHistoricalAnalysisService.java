@@ -1,5 +1,6 @@
 package org.predictiveedge.chart.application;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -72,15 +73,16 @@ public final class MarketScreenHistoricalAnalysisService {
                         List.of(new Instrument(observation.venue(), observation.symbol()))).getFirst();
                 if (resolved.kind() != MarketDataInstrumentKind.EQUITY)
                     throw new IllegalArgumentException("Zerodha instrument is not a cash equity");
-                List<IntradayHistoricalBar> bars = fetchHistory(context, resolved.instrument(),
+                var candles = fetchHistory(context, resolved.instrument(),
                         resolved.providerInstrumentId(), command.analysisCutoff().minus(command.historyWindow()),
-                        command.analysisCutoff()).stream().map(candle -> new IntradayHistoricalBar(
+                        command.analysisCutoff());
+                List<IntradayHistoricalBar> bars = candles.stream().map(candle -> new IntradayHistoricalBar(
                                 LocalDate.ofInstant(candle.timestamp(), MARKET_ZONE), candle.timestamp(),
                                 candle.timestamp().plus(Duration.ofMinutes(5)), candle.open(), candle.high(),
                                 candle.low(), candle.close(), candle.volume(), candle.timestamp().plus(Duration.ofMinutes(5)),
                                 "ZERODHA:" + resolved.providerInstrumentId() + ":5m:" + candle.timestamp())).toList();
                 analyses.add(new InstrumentAnalysis(resolved.providerInstrumentId(), bars.size(), observation,
-                        analyzer.analyze(observation, bars, command.analysisCutoff())));
+                        analyzer.analyze(observation, bars, command.analysisCutoff()), candles));
             } catch (RuntimeException failure) {
                 failures.add(new InstrumentFailure(observation.venue(), observation.symbol(),
                         failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
@@ -141,7 +143,12 @@ public final class MarketScreenHistoricalAnalysisService {
     public record Result(String authority, MarketScreenType screenType, Instant analyzedAt, int parsedRows,
             List<MarketScreenCsvParser.RowRejection> rejectedRows, MarketScreenCandidateRanker.RankedScreen ranking,
             List<InstrumentAnalysis> analyses, List<InstrumentFailure> failures) { }
+    /**
+     * {@code candles} is the history this analysis loaded for the instrument. The evidence collector reuses it, so
+     * no second history call is made. It is left out of the API response, which would otherwise carry every candle.
+     */
     public record InstrumentAnalysis(String providerInstrumentId, int historicalBars,
-            MarketScreenObservation observation, org.predictiveedge.chart.domain.MarketScreenTechnicalAssessment assessment) { }
+            MarketScreenObservation observation, org.predictiveedge.chart.domain.MarketScreenTechnicalAssessment assessment,
+            @JsonIgnore List<Candle> candles) { }
     public record InstrumentFailure(String venue, String symbol, String reason) { }
 }
