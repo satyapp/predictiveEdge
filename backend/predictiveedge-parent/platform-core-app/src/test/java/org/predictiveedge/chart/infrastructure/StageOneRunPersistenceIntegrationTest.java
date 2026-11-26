@@ -193,7 +193,7 @@ class StageOneRunPersistenceIntegrationTest {
 
         assertThat(count("select count(*) from market_intelligence.search_result where search_id = ? "
                 + "and category = 'PRE_OPEN' and screen_type = 'PRE_OPEN'", run.searchId())).isEqualTo(1);
-        assertThat(count("select count(*) from market_intelligence.search_result_stock_pre_open where search_id = ?",
+        assertThat(count("select count(*) from market_intelligence.search_result_pre_open where search_id = ?",
                 run.searchId())).isEqualTo(2);
 
         var connector = new PreOpenEvidenceConnector(Map.of("SBIN", shortlist.get(0), "TCS", shortlist.get(1)));
@@ -201,7 +201,7 @@ class StageOneRunPersistenceIntegrationTest {
         var envelope = new StageOneIntelligenceEvidenceCollector(connector, json, 2)
                 .collect(List.of("SBIN", "TCS"), CUTOFF, null, stage);
 
-        assertThat(count("select count(*) from market_intelligence.selected_stock_evidence_pre_open_analysis e "
+        assertThat(count("select count(*) from market_intelligence.stock_evidence_pre_open e "
                 + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
                 + "where s.search_id = ? and e.source = 'NSE' and e.status = 'SUCCESS'", run.searchId()))
                 .isEqualTo(2);

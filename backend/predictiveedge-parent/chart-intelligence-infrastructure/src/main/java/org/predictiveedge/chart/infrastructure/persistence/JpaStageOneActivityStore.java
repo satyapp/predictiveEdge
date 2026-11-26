@@ -50,7 +50,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     private final InstitutionalFlowsEvidenceRepository institutionalFlowsEvidence;
     private final HistoricalAndPredictiveEvidenceRepository historicalAndPredictiveEvidence;
     private final MarketDepthEvidenceRepository marketDepthEvidence;
-    private final PreOpenAnalysisEvidenceRepository preOpenAnalysisEvidence;
+    private final StockEvidencePreOpenRepository stockEvidencePreOpen;
 
     private final SearchResultStockTopGainersRepository searchResultStockTopGainers;
     private final SearchResultStockTopLosersRepository searchResultStockTopLosers;
@@ -70,7 +70,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     private final SearchResultStockFreshBreakoutsRepository searchResultStockFreshBreakouts;
     private final SearchResultStockNearBreakoutsRepository searchResultStockNearBreakouts;
     private final SearchResultStockTechnicalCrossoversRepository searchResultStockTechnicalCrossovers;
-    private final SearchResultStockPreOpenRepository searchResultStockPreOpen;
+    private final SearchResultPreOpenRepository searchResultPreOpen;
 
     public JpaStageOneActivityStore(EntityManagerFactory entityManagers, PlatformTransactionManager transactionManager,
             ObjectMapper json) {
@@ -93,7 +93,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         this.institutionalFlowsEvidence = repositories.getRepository(InstitutionalFlowsEvidenceRepository.class);
         this.historicalAndPredictiveEvidence = repositories.getRepository(HistoricalAndPredictiveEvidenceRepository.class);
         this.marketDepthEvidence = repositories.getRepository(MarketDepthEvidenceRepository.class);
-        this.preOpenAnalysisEvidence = repositories.getRepository(PreOpenAnalysisEvidenceRepository.class);
+        this.stockEvidencePreOpen = repositories.getRepository(StockEvidencePreOpenRepository.class);
         this.searchResultStockTopGainers = repositories.getRepository(SearchResultStockTopGainersRepository.class);
         this.searchResultStockTopLosers = repositories.getRepository(SearchResultStockTopLosersRepository.class);
         this.searchResultStockMostActiveByVolume = repositories.getRepository(SearchResultStockMostActiveByVolumeRepository.class);
@@ -112,7 +112,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         this.searchResultStockFreshBreakouts = repositories.getRepository(SearchResultStockFreshBreakoutsRepository.class);
         this.searchResultStockNearBreakouts = repositories.getRepository(SearchResultStockNearBreakoutsRepository.class);
         this.searchResultStockTechnicalCrossovers = repositories.getRepository(SearchResultStockTechnicalCrossoversRepository.class);
-        this.searchResultStockPreOpen = repositories.getRepository(SearchResultStockPreOpenRepository.class);
+        this.searchResultPreOpen = repositories.getRepository(SearchResultPreOpenRepository.class);
     }
 
     @Override
@@ -264,7 +264,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case FRESH_BREAKOUTS -> searchResultStockFreshBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockFreshBreakouts::new));
             case NEAR_BREAKOUTS -> searchResultStockNearBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockNearBreakouts::new));
             case TECHNICAL_CROSSOVERS -> searchResultStockTechnicalCrossovers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTechnicalCrossovers::new));
-            case PRE_OPEN -> searchResultStockPreOpen.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockPreOpen::new));
+            case PRE_OPEN -> searchResultPreOpen.saveAll(screenerRows(searchId, createdAt, rows, SearchResultPreOpen::new));
         }
     }
 
@@ -280,7 +280,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case INSTITUTIONAL_FLOWS -> institutionalFlowsEvidence.saveAll(evidenceRows(selectionId, domain, evidence, InstitutionalFlowsEvidence::new));
             case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.saveAll(evidenceRows(selectionId, domain, evidence, HistoricalAndPredictiveEvidence::new));
             case MARKET_DEPTH -> marketDepthEvidence.saveAll(evidenceRows(selectionId, domain, evidence, MarketDepthEvidence::new));
-            case PRE_OPEN_ANALYSIS -> preOpenAnalysisEvidence.saveAll(evidenceRows(selectionId, domain, evidence, PreOpenAnalysisEvidence::new));
+            case PRE_OPEN_ANALYSIS -> stockEvidencePreOpen.saveAll(evidenceRows(selectionId, domain, evidence, StockEvidencePreOpen::new));
         }
     }
 
@@ -296,7 +296,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case INSTITUTIONAL_FLOWS -> institutionalFlowsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
             case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
             case MARKET_DEPTH -> marketDepthEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
-            case PRE_OPEN_ANALYSIS -> preOpenAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case PRE_OPEN_ANALYSIS -> stockEvidencePreOpen.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
         };
     }
 
