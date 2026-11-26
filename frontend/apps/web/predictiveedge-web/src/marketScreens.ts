@@ -102,7 +102,7 @@ export async function analyzeMarketScreenCsv(input: {
   form.set('tradingDate', input.tradingDate);
   form.set('observedAt', `${input.tradingDate}T15:30:00+05:30`);
   form.set('analysisCutoff', `${input.tradingDate}T15:30:00+05:30`);
-  form.set('historyDays', '365');
+  form.set('historyDays', '90');
   form.set('maximumCandidates', String(input.maximumCandidates ?? 10));
   form.set('file', input.file);
   const response = await fetch('/api/chart-intelligence/v1/market-screen-csv-analyses/ollama', {
@@ -167,7 +167,7 @@ export async function analyzeLiveMarketScreen(input: {
       brokerAccountId: input.brokerAccountId,
       screenType: input.screenType,
       tradingDate: input.tradingDate,
-      historyDays: 365,
+      historyDays: 90,
       maximumCandidates: input.maximumCandidates ?? 10,
       setup: input.setup ?? '',
       universe: input.universe ?? '',
@@ -202,7 +202,7 @@ export async function searchLiveMarketScreen(input: {
       brokerAccountId: input.brokerAccountId,
       screenType: input.screenType,
       tradingDate: input.tradingDate,
-      historyDays: 365,
+      historyDays: 90,
       maximumCandidates: input.maximumCandidates ?? 10,
       setup: input.setup ?? '',
       universe: input.universe ?? '',

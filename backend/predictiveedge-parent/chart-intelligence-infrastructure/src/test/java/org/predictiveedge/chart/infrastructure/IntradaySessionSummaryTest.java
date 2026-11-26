@@ -40,9 +40,9 @@ class IntradaySessionSummaryTest {
         assertThat(summary.at("/daily_context/previous_close").asDouble()).isEqualTo(106.0);
         assertThat(summary.at("/daily_context/intraday_high").asDouble()).isEqualTo(104.0);
         assertThat(summary.at("/daily_context/intraday_low").asDouble()).isEqualTo(98.0);
-        assertThat(summary.at("/daily_context/history_high").asDouble()).isEqualTo(110.0);
-        assertThat(summary.at("/daily_context/history_low").asDouble()).isEqualTo(90.0);
-        assertThat(summary.at("/daily_context/history_from").asText()).isEqualTo("2026-11-25");
+        assertThat(summary.at("/daily_context/window_high").asDouble()).isEqualTo(110.0);
+        assertThat(summary.at("/daily_context/window_low").asDouble()).isEqualTo(90.0);
+        assertThat(summary.at("/daily_context/window_from").asText()).isEqualTo("2026-11-25");
     }
 
     @Test

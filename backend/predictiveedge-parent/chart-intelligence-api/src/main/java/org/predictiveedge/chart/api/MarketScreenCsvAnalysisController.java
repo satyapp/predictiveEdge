@@ -78,7 +78,7 @@ public class MarketScreenCsvAnalysisController {
             @RequestParam @NotNull LocalDate tradingDate,
             @RequestParam @NotNull Instant observedAt,
             @RequestParam @NotNull Instant analysisCutoff,
-            @RequestParam(defaultValue = "365") @Min(7) @Max(365) int historyDays,
+            @RequestParam(defaultValue = "90") @Min(7) @Max(365) int historyDays,
             @RequestParam(defaultValue = "10") @Min(1) @Max(20) int maximumCandidates,
             @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Market-screen CSV file is required");

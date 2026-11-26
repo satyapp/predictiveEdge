@@ -100,9 +100,10 @@ final class IntradaySessionSummary {
                 : price(previous.get(previous.size() - 1).close()));
         putDecimal(daily, "intraday_high", highOf(today));
         putDecimal(daily, "intraday_low", lowOf(today));
-        putDecimal(daily, "history_high", highOf(completed));
-        putDecimal(daily, "history_low", lowOf(completed));
-        daily.put("history_from", completed.isEmpty() ? null : date(completed.getFirst()).toString());
+        putDecimal(daily, "window_high", highOf(completed));
+        putDecimal(daily, "window_low", lowOf(completed));
+        daily.put("window_from", completed.isEmpty() ? null : date(completed.getFirst()).toString());
+        daily.put("window_to", session.toString());
         var ranges = recent.stream().map(day -> highOf(day).subtract(lowOf(day))).toList();
         putDecimal(daily, "average_daily_range_prior_sessions", ranges.isEmpty() ? null
                 : ranges.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
