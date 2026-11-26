@@ -112,9 +112,14 @@ public final class PreOpenCsvAnalysisService {
                 .toList();
         var ranking = ranker.rank(candidates.stream().map(InstrumentAnalysis::assessment).toList(),
                 command.maximumCandidates());
+        // Every accepted row of the day, most-traded first, so each stock of the day has its pre-open row stored.
+        List<PreOpenSnapshot> dayRows = parsed.snapshots().stream()
+                .sorted(Comparator.comparing(PreOpenSnapshot::auctionTurnover).reversed()
+                        .thenComparing(PreOpenSnapshot::symbol))
+                .toList();
         return new Result("CANDIDATE_ONLY", startedAt, clock.instant(), parsed.snapshots().size(),
                 parsed.rejectedRows(), shortlisted.size(), List.copyOf(analyses), candidates, ranking,
-                List.copyOf(failures), List.copyOf(shortlisted));
+                List.copyOf(failures), List.copyOf(shortlisted), dayRows);
     }
 
     private List<Candle> fetchHistory(
@@ -190,7 +195,8 @@ public final class PreOpenCsvAnalysisService {
             List<InstrumentAnalysis> candidates,
             PreOpenCandidateRanker.RankedUniverse ranking,
             List<InstrumentFailure> failures,
-            List<PreOpenSnapshot> shortlist) { }
+            List<PreOpenSnapshot> shortlist,
+            List<PreOpenSnapshot> dayRows) { }
 
     public record InstrumentAnalysis(
             String providerInstrumentId, int historicalBars, IntradaySetupAssessment assessment) { }

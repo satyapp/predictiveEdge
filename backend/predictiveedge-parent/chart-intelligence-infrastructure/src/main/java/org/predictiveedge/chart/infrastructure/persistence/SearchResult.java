@@ -57,6 +57,10 @@ public class SearchResult {
 
     protected SearchResult() { }
 
+    public UUID searchId() { return searchId; }
+    public UUID userId() { return userId; }
+    public LocalDate tradingDate() { return tradingDate; }
+
     public SearchResult(UUID searchId, UUID userId, String category, String screenType, String setup,
             String universe, String timeframe, LocalDate tradingDate, String brokerAccountId, String criteriaJson,
             int resultCount, String stage, Instant searchedAt) {

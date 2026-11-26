@@ -188,5 +188,11 @@ class ScreenerRunRecorderTest {
         public Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public java.util.Optional<StageOneActivityStore.PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId,
+                String symbol) {
+            return java.util.Optional.empty();
+        }
     }
 }

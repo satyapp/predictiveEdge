@@ -285,6 +285,12 @@ class StageOneIntelligenceEvidenceCollectorTest {
         }
 
         @Override
+        public java.util.Optional<StageOneActivityStore.PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId,
+                String symbol) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
         public String evidenceByDomainJson(UUID selectionId) {
             ObjectNode byDomain = new ObjectMapper().createObjectNode();
             for (EvidenceDomain domain : EvidenceDomain.values()) byDomain.putArray(domain.name());

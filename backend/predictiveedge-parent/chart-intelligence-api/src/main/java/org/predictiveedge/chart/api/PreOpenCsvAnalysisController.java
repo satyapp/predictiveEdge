@@ -95,7 +95,7 @@ public class PreOpenCsvAnalysisController {
                     brokerAccountId, csv, tradingDate, observedAt,
                     analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
             var run = runs.recordPreOpen(identity.user().id(), brokerAccountId, tradingDate,
-                    deterministic.shortlist(), criteria(brokerAccountId, tradingDate, historyDays, maximumCandidates),
+                    deterministic.dayRows(), criteria(brokerAccountId, tradingDate, historyDays, maximumCandidates),
                     this::serialize, deterministic.startedAt());
             var stageOne = ollama.analyze(identity.user().id(), deterministic, run);
             var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),

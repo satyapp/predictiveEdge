@@ -11,12 +11,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.decision.domain.DecisionResourceType;
 import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
@@ -57,6 +59,15 @@ final class StageOneIntelligenceEvidenceCollector {
         this.json = Objects.requireNonNull(json, "Object mapper is required");
         if (workersPerDataType < 1) throw new IllegalArgumentException("At least one worker per data type is required");
         this.workersPerDataType = workersPerDataType;
+    }
+
+    /**
+     * The same collector, except that the pre-open evidence of each stock of the search comes from that stock's row
+     * in the user's pre-open run for the search's trading day.
+     */
+    StageOneIntelligenceEvidenceCollector withPreOpenRows(StageOneActivityStore store, UUID userId, UUID searchId) {
+        return new StageOneIntelligenceEvidenceCollector(
+                new PreOpenRowEvidenceConnector(connector, store, userId, searchId), json, workersPerDataType);
     }
 
     ObjectNode collect(Collection<String> symbols, Instant cutoff) {

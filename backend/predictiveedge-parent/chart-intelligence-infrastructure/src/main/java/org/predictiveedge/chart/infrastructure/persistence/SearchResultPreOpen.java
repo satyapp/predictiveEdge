@@ -51,6 +51,14 @@ public class SearchResultPreOpen extends SearchResultStockRow {
 
     protected SearchResultPreOpen() { }
 
+    /** The CSV columns of this row. Rows stored before V020 have every column null. */
+    public PreOpenAuctionDetail detail() {
+        return new PreOpenAuctionDetail(prevClose, bestBidPrice, bestBidQty, bestAskPrice, bestAskQty,
+                indicativeEquilibriumPrice, indicativeEquilibriumQty, priceChange, percentChange, finalPrice,
+                finalVolume, tradedValue, ffmCap, indicativeImbalanceQtyAtEquilibrium,
+                indicativeImbalanceQtyAtMarketOrder, week52High, week52Low);
+    }
+
     public SearchResultPreOpen(SearchStockKey key, int screenRank, String brokerRow, Instant createdAt,
             PreOpenAuctionDetail detail) {
         super(key, screenRank, brokerRow, createdAt);

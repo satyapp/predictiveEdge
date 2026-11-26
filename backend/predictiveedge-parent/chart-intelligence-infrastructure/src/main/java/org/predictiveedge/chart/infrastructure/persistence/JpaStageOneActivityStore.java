@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.predictiveedge.chart.application.SearchEvidenceCategory;
@@ -191,6 +192,20 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             }
             return write(byDomain);
         });
+    }
+
+    @Override
+    public Optional<StageOneActivityStore.PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId, String symbol) {
+        Objects.requireNonNull(userId, "User id is required");
+        Objects.requireNonNull(searchId, "Search id is required");
+        String stock = Objects.requireNonNull(symbol, "Symbol is required").trim().toUpperCase(java.util.Locale.ROOT);
+        return transactions.execute(status -> searchResults.findById(searchId)
+                .filter(search -> userId.equals(search.userId()))
+                .flatMap(search -> searchResults.findFirstByUserIdAndCategoryAndTradingDateOrderBySearchedAtDesc(
+                        userId, SearchEvidenceCategory.PRE_OPEN.name(), search.tradingDate()))
+                .flatMap(preOpen -> searchResultPreOpen.findById(new SearchStockKey(preOpen.searchId(), stock))
+                        .map(row -> new StageOneActivityStore.PreOpenRow(preOpen.searchId(), preOpen.tradingDate(),
+                                stock, row.screenRank(), row.brokerRow(), row.detail(), row.createdAt()))));
     }
 
     @Override

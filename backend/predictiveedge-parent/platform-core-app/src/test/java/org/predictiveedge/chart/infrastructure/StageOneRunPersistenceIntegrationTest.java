@@ -229,6 +229,40 @@ class StageOneRunPersistenceIntegrationTest {
                 sbin, tcs)).isEqualTo(2);
     }
 
+    @Test
+    void givesEachSelectedTopGainerItsPreOpenRowOfTheTradingDay() throws Exception {
+        var json = new ObjectMapper().findAndRegisterModules();
+        UUID userId = UUID.randomUUID();
+        // The pre-open run holds the whole day, including INFY and TCS, which the shortlist may not contain.
+        var dayRows = List.of(preOpen("SBIN", "800.00"), preOpen("INFY", "1500.00"), preOpen("TCS", "3900.00"));
+        new ScreenerRunRecorder(store).recordPreOpen(userId, "broker-it", TRADING_DATE, dayRows,
+                "{\"historyDays\":365}", snapshot -> write(json, Map.of("symbol", snapshot.symbol())), CUTOFF);
+
+        var copy = new MarketScreenDataCopy(MarketScreenType.TOP_GAINERS, "NSE_MCP", CUTOFF, CUTOFF, "LIVE",
+                List.of(observation("INFY", 1, "3.20"), observation("TCS", 2, "2.10")), List.of());
+        var run = new ScreenerRunRecorder(store).record(userId, "broker-it", TRADING_DATE, copy, "breakout",
+                "NIFTY", "5m", "{\"screenType\":\"TOP_GAINERS\"}", row -> write(json, row));
+
+        var stage = new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), CUTOFF);
+        var envelope = new StageOneIntelligenceEvidenceCollector(new FixedConnector(), json, 2)
+                .withPreOpenRows(store, userId, run.searchId())
+                .collect(List.of("INFY", "TCS"), CUTOFF, BrokerContext.withoutCredentials(userId, "broker-it"), stage);
+
+        assertThat(envelope.at("/stocks/0/symbol").asText()).isEqualTo("INFY");
+        assertThat(envelope.at("/stocks/0/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/kind").asText())
+                .isEqualTo("PRE_OPEN_SEARCH_RESULT");
+        assertThat(envelope.at("/stocks/0/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/screen_rank").asInt())
+                .isEqualTo(2);
+        assertThat(envelope.at("/stocks/0/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/final_price").asDouble())
+                .isEqualTo(1501.0);
+        assertThat(envelope.at("/stocks/1/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/symbol").asText())
+                .isEqualTo("TCS");
+        assertThat(count("select count(*) from market_intelligence.stock_evidence_pre_open e "
+                + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
+                + "where s.search_id = ? and e.source = 'NSE' and e.status = 'SUCCESS'", run.searchId()))
+                .isEqualTo(2);
+    }
+
     private static PreOpenSnapshot preOpen(String symbol, String price) {
         BigDecimal value = new BigDecimal(price);
         var detail = new PreOpenAuctionDetail(value, value, 500L, value.add(BigDecimal.ONE), 700L,

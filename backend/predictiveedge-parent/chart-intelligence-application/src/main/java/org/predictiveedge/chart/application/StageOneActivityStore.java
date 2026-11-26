@@ -52,6 +52,13 @@ public interface StageOneActivityStore {
     String evidenceByDomainJson(UUID selectionId);
 
     /**
+     * The pre-open row of one stock for the trading day of a search: the stock's row in the user's most recent
+     * pre-open run on that day. Empty when the search is unknown, no pre-open run exists for that day, or the stock
+     * is not in the run.
+     */
+    java.util.Optional<PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId, String symbol);
+
+    /**
      * Writes one data type's evidence for one selected stock. {@code evidenceJson} is the JSON array of that domain's
      * provider evidence, as the collector produces it. The selection must already be recorded.
      */
@@ -108,6 +115,10 @@ public interface StageOneActivityStore {
             requireDistinctSymbols(rows.stream().map(ScreenerRow::symbol).toList(), "Screener rows");
         }
     }
+
+    /** One stock's row in a pre-open run, with the CSV columns of that row when they were stored. */
+    record PreOpenRow(UUID preOpenSearchId, LocalDate tradingDate, String symbol, int screenRank,
+            String brokerRowJson, PreOpenAuctionDetail detail, Instant storedAt) { }
 
     /** One screener row. {@code preOpenDetail} is set only for PRE_OPEN rows parsed from the NSE pre-open CSV. */
     record ScreenerRow(String symbol, int screenRank, String brokerRowJson, PreOpenAuctionDetail preOpenDetail) {
