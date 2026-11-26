@@ -26,9 +26,12 @@ import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneAiResult;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Local-model interpretation of deterministic Top Gainer/Loser historical evidence. */
 public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOllamaAnalysisPort {
+    private static final Logger LOG = LoggerFactory.getLogger(OllamaMarketScreenAnalysisAdapter.class);
     private static final String SYSTEM = """
             You are PredictiveEdge's preliminary NSE market-screen analyst. Use only supplied deterministic facts.
             Never invent news, fundamentals, prices, indicators, probabilities, or events. Return every supplied
@@ -102,6 +105,7 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
                 "Evaluate all twelve intelligence modules in this frozen evidence JSON:\n" + evidenceJson);
         request.set("format", schema()); request.putObject("options").put("temperature", 0)
                 .put("num_ctx", contextTokens).put("num_predict", outputTokens);
+        logPromptSize(evidence, evidenceJson);
         try {
             var httpRequest = HttpRequest.newBuilder(endpoint).timeout(timeout).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(write(request))).build();
@@ -221,5 +225,24 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
         case NO_TRADE -> "NO_TRADE"; case INSUFFICIENT_EVIDENCE -> "INSUFFICIENT_EVIDENCE"; }; }
     private static void put(ObjectNode node, String name, java.math.BigDecimal value) { if (value == null) node.putNull(name); else node.put(name, value); }
     private String write(Object value) { try { return json.writeValueAsString(value); } catch (com.fasterxml.jackson.core.JsonProcessingException failure) { throw new IllegalArgumentException("Ollama payload cannot be serialized", failure); } }
+    /**
+     * Logs the size of each part of the prompt, so a run shows where the context goes. Sizes are characters with a
+     * rough token estimate (about four characters per token); the model's own count comes from its response.
+     */
+    private void logPromptSize(ObjectNode evidence, String evidenceJson) {
+        String schemaJson = write(schema());
+        long total = SYSTEM.length() + schemaJson.length() + evidenceJson.length();
+        var perStock = new StringBuilder();
+        for (JsonNode stock : evidence.path("stocks")) {
+            if (perStock.length() > 0) perStock.append(", ");
+            perStock.append(stock.path("symbol").asText()).append('=')
+                    .append(write(stock).length());
+        }
+        LOG.info("Ollama prompt: total_chars={} est_tokens={} num_ctx={} num_predict={} system_chars={} "
+                + "schema_chars={} evidence_chars={} per_stock_chars=[{}]",
+                total, total / 4, contextTokens, outputTokens, SYSTEM.length(), schemaJson.length(),
+                evidenceJson.length(), perStock);
+    }
+
     private static String required(String value, String label) { if (value == null || value.isBlank()) throw new IllegalStateException(label + " is missing"); return value.trim(); }
 }
