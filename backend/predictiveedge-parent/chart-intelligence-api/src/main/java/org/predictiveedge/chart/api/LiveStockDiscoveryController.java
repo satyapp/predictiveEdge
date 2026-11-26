@@ -11,11 +11,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import org.predictiveedge.chart.application.LiveMarketScreenAnalysisService;
 import org.predictiveedge.chart.application.LiveMarketScreenSource;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneGoldenCopy;
 import org.predictiveedge.chart.domain.MarketScreenType;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
@@ -34,11 +36,13 @@ public class LiveStockDiscoveryController {
     private final LiveMarketScreenAnalysisService service;
     private final MarketScreenOllamaAnalysisPort ollama;
     private final AnalysisRunRecorder history;
+    private final ScreenerRunRecorder runs;
     private final ObjectMapper json;
 
     public LiveStockDiscoveryController(LiveMarketScreenAnalysisService service,
-            MarketScreenOllamaAnalysisPort ollama, AnalysisRunRecorder history, ObjectMapper json) {
-        this.service = service; this.ollama = ollama; this.history = history; this.json = json;
+            MarketScreenOllamaAnalysisPort ollama, AnalysisRunRecorder history, ScreenerRunRecorder runs,
+            ObjectMapper json) {
+        this.service = service; this.ollama = ollama; this.history = history; this.runs = runs; this.json = json;
     }
 
     @GetMapping("/capabilities")
@@ -48,16 +52,18 @@ public class LiveStockDiscoveryController {
     public SearchResponse search(@AuthenticationPrincipal AuthenticatedIdentity identity,
             @Valid @RequestBody Request request) {
         var dataCopy = service.search(command(identity, request));
-        return new SearchResponse("BROKER_SCREEN_ONLY", dataCopy);
+        var run = record(identity, request, dataCopy);
+        return new SearchResponse("BROKER_SCREEN_ONLY", dataCopy, run.searchId());
     }
 
     @PostMapping("/ollama")
     public Response analyze(@AuthenticationPrincipal AuthenticatedIdentity identity,
             @Valid @RequestBody Request request) {
         var live = service.analyze(command(identity, request));
-        var stageOne = ollama.analyze(identity.user().id(), request.brokerAccountId(), live.deterministic());
+        var run = record(identity, request, live.dataCopy());
+        var stageOne = ollama.analyze(identity.user().id(), request.brokerAccountId(), live.deterministic(), run);
         var response = new Response("PRELIMINARY_NOT_FINAL", live.dataCopy(), live.deterministic(),
-                stageOne.analysis(), stageOne.goldenCopy());
+                stageOne.analysis(), stageOne.goldenCopy(), run.searchId());
         String mode = request.selectedSymbol().isBlank() ? "MARKET_SCREEN_FULL" : "CONSOLIDATED_LEVEL_ONE";
         history.record(identity.user().id(), request.screenType().name(), mode,
                 live.dataCopy().source(), serialize(live.dataCopy()), request.tradingDate(),
@@ -70,6 +76,13 @@ public class LiveStockDiscoveryController {
                 request.screenType(), request.tradingDate(), Instant.now(), Duration.ofDays(request.historyDays()),
                 request.maximumCandidates(), request.setup(), request.universe(), request.timeframe(),
                 request.selectedSymbol());
+    }
+
+    /** Saves the screener run before any of its stocks are selected, so every selection has a parent run. */
+    private ScreenerRunRecorder.ScreenerRun record(AuthenticatedIdentity identity, Request request,
+            org.predictiveedge.chart.application.MarketScreenDataCopy dataCopy) {
+        return runs.record(identity.user().id(), request.brokerAccountId(), request.tradingDate(), dataCopy,
+                request.setup(), request.universe(), request.timeframe(), serialize(request), this::serialize);
     }
 
     private String serialize(Object value) {
@@ -94,8 +107,8 @@ public class LiveStockDiscoveryController {
     public record Response(String authority,
             org.predictiveedge.chart.application.MarketScreenDataCopy dataCopy,
             MarketScreenHistoricalAnalysisService.Result deterministic,
-            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy) { }
+            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy, UUID searchId) { }
 
     public record SearchResponse(String authority,
-            org.predictiveedge.chart.application.MarketScreenDataCopy dataCopy) { }
+            org.predictiveedge.chart.application.MarketScreenDataCopy dataCopy, UUID searchId) { }
 }

@@ -63,6 +63,13 @@ export type LiveMarketScreenCapability = {
 
 export type LiveMarketScreenAnalysisResponse = MarketScreenAnalysisResponse & {
   dataCopy: LiveMarketScreenDataCopy;
+  searchId: string;
+};
+
+export type IntradayListSaveResponse = {
+  listId: string;
+  searchId: string;
+  symbols: string[];
 };
 
 export type LiveMarketScreenDataCopy = {
@@ -121,6 +128,25 @@ export async function loadLiveMarketScreenCapabilities(accessToken: string) {
     throw new Error(`Live NSE MCP capabilities are unavailable (HTTP ${response.status}).`);
   }
   return response.json() as Promise<LiveMarketScreenCapability[]>;
+}
+
+export async function saveIntradayList(input: {
+  accessToken: string;
+  searchId: string;
+  symbols: string[];
+}) {
+  const response = await fetch('/api/chart-intelligence/v1/intraday-lists', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ searchId: input.searchId, symbols: input.symbols }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Your PredictiveEdge session has expired. Sign out and sign in again.');
+    const payload = await response.json().catch(() => ({})) as { message?: string; fieldErrors?: { message?: string }[] };
+    throw new Error(payload.fieldErrors?.find((value) => value.message)?.message
+      ?? payload.message ?? `The intraday list could not be saved (HTTP ${response.status}).`);
+  }
+  return response.json() as Promise<IntradayListSaveResponse>;
 }
 
 export async function analyzeLiveMarketScreen(input: {

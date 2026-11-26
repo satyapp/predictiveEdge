@@ -1,0 +1,19 @@
+-- Pre-open tables take the names used by the pre-open workflow:
+--   search_result_stock_pre_open                -> search_result_pre_open
+--     (pre-open CSV stock details, one row per parsed screener row)
+--   selected_stock_evidence_pre_open_analysis   -> stock_evidence_pre_open
+--     (pre-open evidence saved for each selected stock that the AI analysis reads)
+
+alter table market_intelligence.search_result_stock_pre_open rename to search_result_pre_open;
+alter table market_intelligence.search_result_pre_open rename constraint search_result_stock_pre_open_pkey to search_result_pre_open_pkey;
+alter table market_intelligence.search_result_pre_open rename constraint search_result_stock_pre_open_search_id_fkey to search_result_pre_open_search_id_fkey;
+alter table market_intelligence.search_result_pre_open rename constraint chk_search_result_stock_pre_open_symbol to chk_search_result_pre_open_symbol;
+alter table market_intelligence.search_result_pre_open rename constraint chk_search_result_stock_pre_open_rank to chk_search_result_pre_open_rank;
+alter table market_intelligence.search_result_pre_open rename constraint chk_search_result_stock_pre_open_row to chk_search_result_pre_open_row;
+
+alter table market_intelligence.selected_stock_evidence_pre_open_analysis rename to stock_evidence_pre_open;
+alter table market_intelligence.stock_evidence_pre_open rename constraint selected_stock_evidence_pre_open_analysis_pkey to stock_evidence_pre_open_pkey;
+alter table market_intelligence.stock_evidence_pre_open rename constraint selected_stock_evidence_pre_open_analysis_selection_id_fkey to stock_evidence_pre_open_selection_id_fkey;
+alter table market_intelligence.stock_evidence_pre_open rename constraint chk_selected_stock_evidence_pre_open_analysis_stage to chk_stock_evidence_pre_open_stage;
+alter table market_intelligence.stock_evidence_pre_open rename constraint chk_selected_stock_evidence_pre_open_analysis_source to chk_stock_evidence_pre_open_source;
+alter table market_intelligence.stock_evidence_pre_open rename constraint chk_selected_stock_evidence_pre_open_analysis_status to chk_stock_evidence_pre_open_status;

@@ -15,7 +15,15 @@ public record PreOpenSnapshot(
         BigDecimal auctionTurnover,
         BigDecimal bestBid,
         BigDecimal bestAsk,
-        Instant observedAt) {
+        Instant observedAt,
+        PreOpenAuctionDetail detail) {
+
+    public PreOpenSnapshot(String venue, String symbol, String series, BigDecimal previousClose,
+            BigDecimal auctionPrice, long auctionVolume, BigDecimal auctionTurnover, BigDecimal bestBid,
+            BigDecimal bestAsk, Instant observedAt) {
+        this(venue, symbol, series, previousClose, auctionPrice, auctionVolume, auctionTurnover, bestBid, bestAsk,
+                observedAt, null);
+    }
 
     public PreOpenSnapshot {
         venue = required(venue, "Venue").toUpperCase();

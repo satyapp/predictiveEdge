@@ -3,14 +3,19 @@ package org.predictiveedge.chart.infrastructure.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.predictiveedge.chart.application.SearchEvidenceCategory;
@@ -47,7 +52,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     private final InstitutionalFlowsEvidenceRepository institutionalFlowsEvidence;
     private final HistoricalAndPredictiveEvidenceRepository historicalAndPredictiveEvidence;
     private final MarketDepthEvidenceRepository marketDepthEvidence;
-    private final PreOpenAnalysisEvidenceRepository preOpenAnalysisEvidence;
+    private final StockEvidencePreOpenRepository stockEvidencePreOpen;
 
     private final SearchResultStockTopGainersRepository searchResultStockTopGainers;
     private final SearchResultStockTopLosersRepository searchResultStockTopLosers;
@@ -67,7 +72,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     private final SearchResultStockFreshBreakoutsRepository searchResultStockFreshBreakouts;
     private final SearchResultStockNearBreakoutsRepository searchResultStockNearBreakouts;
     private final SearchResultStockTechnicalCrossoversRepository searchResultStockTechnicalCrossovers;
-    private final SearchResultStockPreOpenRepository searchResultStockPreOpen;
+    private final SearchResultPreOpenRepository searchResultPreOpen;
 
     public JpaStageOneActivityStore(EntityManagerFactory entityManagers, PlatformTransactionManager transactionManager,
             ObjectMapper json) {
@@ -90,7 +95,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         this.institutionalFlowsEvidence = repositories.getRepository(InstitutionalFlowsEvidenceRepository.class);
         this.historicalAndPredictiveEvidence = repositories.getRepository(HistoricalAndPredictiveEvidenceRepository.class);
         this.marketDepthEvidence = repositories.getRepository(MarketDepthEvidenceRepository.class);
-        this.preOpenAnalysisEvidence = repositories.getRepository(PreOpenAnalysisEvidenceRepository.class);
+        this.stockEvidencePreOpen = repositories.getRepository(StockEvidencePreOpenRepository.class);
         this.searchResultStockTopGainers = repositories.getRepository(SearchResultStockTopGainersRepository.class);
         this.searchResultStockTopLosers = repositories.getRepository(SearchResultStockTopLosersRepository.class);
         this.searchResultStockMostActiveByVolume = repositories.getRepository(SearchResultStockMostActiveByVolumeRepository.class);
@@ -109,7 +114,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         this.searchResultStockFreshBreakouts = repositories.getRepository(SearchResultStockFreshBreakoutsRepository.class);
         this.searchResultStockNearBreakouts = repositories.getRepository(SearchResultStockNearBreakoutsRepository.class);
         this.searchResultStockTechnicalCrossovers = repositories.getRepository(SearchResultStockTechnicalCrossoversRepository.class);
-        this.searchResultStockPreOpen = repositories.getRepository(SearchResultStockPreOpenRepository.class);
+        this.searchResultPreOpen = repositories.getRepository(SearchResultPreOpenRepository.class);
     }
 
     @Override
@@ -118,10 +123,11 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         search.rows().forEach(row -> readObject(row.brokerRowJson(), "Broker row JSON"));
         transactions.executeWithoutResult(status -> {
             searchResults.saveAndFlush(new SearchResult(search.searchId(), search.userId(), search.category().name(),
-                    search.screenType().name(), search.setup(), search.universe(), search.timeframe(),
+                    search.screenType(), search.setup(), search.universe(), search.timeframe(),
                     search.tradingDate(), search.brokerAccountId(), search.criteriaJson(), search.rows().size(),
                     STAGE_1, search.searchedAt()));
-            saveScreenerRows(search.category(), search.searchId(), search.searchedAt(), search.rows());
+            saveScreenerRows(search.category(), search.searchId(), search.tradingDate(), search.searchedAt(),
+                    search.rows());
         });
     }
 
@@ -151,6 +157,57 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     public void recordSelectedStocks(SelectionStart start) {
         transactions.executeWithoutResult(status -> saveSelections(start.searchId(), start.userId(),
                 start.category(), start.selectedAt(), start.stocks()));
+    }
+
+    @Override
+    public void recordAnalysis(UUID selectionId, StageOneAnalysisInput analysis) {
+        readObject(analysis.analysisJson(), "Analysis JSON");
+        transactions.executeWithoutResult(status -> {
+            if (!selectedStocks.existsById(selectionId))
+                throw new IllegalArgumentException("Selection must be recorded before its analysis");
+            AiAnalysisKey key = new AiAnalysisKey(selectionId, STAGE_1);
+            if (selectedStockAiAnalyses.existsById(key))
+                throw new IllegalStateException("Selection already has Stage-1 analysis");
+            selectedStockAiAnalyses.save(new SelectedStockAiAnalysis(key, analysis.stance(), analysis.thesis(),
+                    analysis.confirmation(), analysis.risk(), analysis.model(), analysis.analysisJson(),
+                    analysis.generatedAt()));
+        });
+    }
+
+    @Override
+    public Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId) {
+        Map<String, UUID> bySymbol = new HashMap<>();
+        selectedStocks.findBySearchIdAndUserId(searchId, userId)
+                .forEach(selection -> bySymbol.put(selection.getSymbol(), selection.getSelectionId()));
+        return bySymbol;
+    }
+
+    @Override
+    public String evidenceByDomainJson(UUID selectionId) {
+        return transactions.execute(status -> {
+            ObjectNode byDomain = json.createObjectNode();
+            for (EvidenceDomain domain : EvidenceDomain.values()) {
+                ArrayNode items = byDomain.putArray(domain.name());
+                evidenceRows(domain, selectionId).stream()
+                        .sorted(Comparator.comparing(EvidenceRow::fetchedAt).thenComparing(EvidenceRow::source))
+                        .forEach(row -> items.add(evidenceItem(domain, row)));
+            }
+            return write(byDomain);
+        });
+    }
+
+    @Override
+    public Optional<StageOneActivityStore.PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId, String symbol) {
+        Objects.requireNonNull(userId, "User id is required");
+        Objects.requireNonNull(searchId, "Search id is required");
+        String stock = Objects.requireNonNull(symbol, "Symbol is required").trim().toUpperCase(java.util.Locale.ROOT);
+        return transactions.execute(status -> searchResults.findById(searchId)
+                .filter(search -> userId.equals(search.userId()))
+                .flatMap(search -> searchResults.findFirstByUserIdAndCategoryAndTradingDateOrderBySearchedAtDesc(
+                        userId, SearchEvidenceCategory.PRE_OPEN.name(), search.tradingDate()))
+                .flatMap(preOpen -> searchResultPreOpen.findById(new SearchStockKey(preOpen.searchId(), stock))
+                        .map(row -> new StageOneActivityStore.PreOpenRow(preOpen.searchId(), preOpen.tradingDate(),
+                                stock, row.screenRank(), row.brokerRow(), row.detail(), row.createdAt()))));
     }
 
     @Override
@@ -203,8 +260,8 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         selectedStocks.saveAllAndFlush(selections);
     }
 
-    private void saveScreenerRows(SearchEvidenceCategory category, UUID searchId, Instant createdAt,
-            List<ScreenerRow> rows) {
+    private void saveScreenerRows(SearchEvidenceCategory category, UUID searchId, LocalDate tradingDate,
+            Instant createdAt, List<ScreenerRow> rows) {
         switch (category) {
             case TOP_GAINERS -> searchResultStockTopGainers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTopGainers::new));
             case TOP_LOSERS -> searchResultStockTopLosers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTopLosers::new));
@@ -224,7 +281,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case FRESH_BREAKOUTS -> searchResultStockFreshBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockFreshBreakouts::new));
             case NEAR_BREAKOUTS -> searchResultStockNearBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockNearBreakouts::new));
             case TECHNICAL_CROSSOVERS -> searchResultStockTechnicalCrossovers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTechnicalCrossovers::new));
-            case PRE_OPEN -> searchResultStockPreOpen.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockPreOpen::new));
+            case PRE_OPEN -> searchResultPreOpen.saveAll(preOpenRows(searchId, tradingDate, createdAt, rows));
         }
     }
 
@@ -240,8 +297,53 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case INSTITUTIONAL_FLOWS -> institutionalFlowsEvidence.saveAll(evidenceRows(selectionId, domain, evidence, InstitutionalFlowsEvidence::new));
             case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.saveAll(evidenceRows(selectionId, domain, evidence, HistoricalAndPredictiveEvidence::new));
             case MARKET_DEPTH -> marketDepthEvidence.saveAll(evidenceRows(selectionId, domain, evidence, MarketDepthEvidence::new));
-            case PRE_OPEN_ANALYSIS -> preOpenAnalysisEvidence.saveAll(evidenceRows(selectionId, domain, evidence, PreOpenAnalysisEvidence::new));
+            case PRE_OPEN_ANALYSIS -> stockEvidencePreOpen.saveAll(evidenceRows(selectionId, domain, evidence, StockEvidencePreOpen::new));
         }
+    }
+
+    private List<? extends EvidenceRow> evidenceRows(EvidenceDomain domain, UUID selectionId) {
+        return switch (domain) {
+            case MARKET_DATA -> marketDataEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case TECHNICAL_ANALYSIS -> technicalAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case CHART_PATTERNS -> chartPatternsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case FUNDAMENTAL_ANALYSIS -> fundamentalAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case NEWS_AND_SENTIMENT -> newsAndSentimentEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case CORPORATE_ACTIONS -> corporateActionsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case MACRO_AND_ECONOMIC -> macroAndEconomicEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case INSTITUTIONAL_FLOWS -> institutionalFlowsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case MARKET_DEPTH -> marketDepthEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case PRE_OPEN_ANALYSIS -> stockEvidencePreOpen.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+        };
+    }
+
+    /** Rebuilds one provider-evidence item in the envelope's shape, as {@link #recordEvidence} reads it. */
+    private ObjectNode evidenceItem(EvidenceDomain domain, EvidenceRow row) {
+        ObjectNode item = json.createObjectNode();
+        item.put("domain", domain.name());
+        item.put("source", row.source());
+        item.put("role", row.role());
+        item.put("status", row.status());
+        item.put("fetched_at", row.fetchedAt().toString());
+        if (row.payload() == null) item.putNull("payload");
+        else item.set("payload", readAny(row.payload(), "Evidence payload"));
+        if (row.detail() == null) item.putNull("detail");
+        else item.put("detail", row.detail());
+        return item;
+    }
+
+    private JsonNode readAny(String value, String label) {
+        try {
+            return json.readTree(value);
+        } catch (JsonProcessingException failure) {
+            throw new IllegalStateException(label + " is not valid JSON", failure);
+        }
+    }
+
+    private static List<SearchResultPreOpen> preOpenRows(UUID searchId, LocalDate tradingDate, Instant createdAt,
+            List<ScreenerRow> rows) {
+        return rows.stream().map(row -> new SearchResultPreOpen(new SearchStockKey(searchId, row.symbol()),
+                tradingDate, row.screenRank(), row.brokerRowJson(), createdAt, row.preOpenDetail())).toList();
     }
 
     private static <T> List<T> screenerRows(UUID searchId, Instant createdAt, List<ScreenerRow> rows,

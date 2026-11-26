@@ -25,6 +25,11 @@ public abstract class SearchResultStockRow {
 
     protected SearchResultStockRow() { }
 
+    public SearchStockKey key() { return key; }
+    public int screenRank() { return screenRank; }
+    public String brokerRow() { return brokerRow; }
+    public Instant createdAt() { return createdAt; }
+
     protected SearchResultStockRow(SearchStockKey key, int screenRank, String brokerRow, Instant createdAt) {
         this.key = key;
         this.screenRank = screenRank;

@@ -11,12 +11,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.decision.domain.DecisionResourceType;
 import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
@@ -29,10 +31,12 @@ import org.predictiveedge.intelligence.connector.ProviderEvidence;
 /**
  * Builds the complete twelve-module evidence envelope used by Stage-1 and preserved for Stage-2.
  *
- * <p>Fetching is parallel. Each evidence domain (data type) has its own group of worker threads, and every
- * (stock, domain) pair is fetched by exactly one worker. A worker hands its result to an {@link EvidenceWriter}
- * before it finishes. When all domains for a stock have finished, a collator thread builds that stock's package.
- * The envelope lists stocks in the order they were given.</p>
+ * <p>The work runs in three kinds of threads. Each evidence domain (data type) has its own group of fetch workers,
+ * and every (stock, domain) pair is fetched by exactly one worker. A worker writes its result to the
+ * {@link EvidenceStage} before it finishes. When every domain for a stock has been written, a collator thread reads
+ * that stock back from the stage and builds its package. In a persisted run the stage is the database, so the
+ * package is built from stored rows, not from the fetch results held in memory. The envelope lists stocks in the
+ * order they were given.</p>
  *
  * <p>A failed fetch or write stops the run: the first failure is rethrown after the running work has settled.</p>
  */
@@ -57,19 +61,28 @@ final class StageOneIntelligenceEvidenceCollector {
         this.workersPerDataType = workersPerDataType;
     }
 
+    /**
+     * The same collector, except that the pre-open evidence of each stock of the search comes from that stock's row
+     * in the user's pre-open run for the search's trading day.
+     */
+    StageOneIntelligenceEvidenceCollector withPreOpenRows(StageOneActivityStore store, UUID userId, UUID searchId) {
+        return new StageOneIntelligenceEvidenceCollector(
+                new PreOpenRowEvidenceConnector(connector, store, userId, searchId), json, workersPerDataType);
+    }
+
     ObjectNode collect(Collection<String> symbols, Instant cutoff) {
         return collect(symbols, cutoff, null);
     }
 
+    /** Collects in memory, without saving. */
     ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext) {
-        return collect(symbols, cutoff, brokerContext, EvidenceWriter.DISCARD);
+        return collect(symbols, cutoff, brokerContext, new InMemoryEvidenceStage());
     }
 
-    /** Fetches every stock in parallel, passes each result to {@code writer}, and returns the collated envelope. */
-    ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext,
-            EvidenceWriter writer) {
+    /** Fetches every stock in parallel, stores each result in {@code stage}, and returns the collated envelope. */
+    ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext, EvidenceStage stage) {
         Objects.requireNonNull(cutoff, "Evidence cutoff is required");
-        Objects.requireNonNull(writer, "Evidence writer is required");
+        Objects.requireNonNull(stage, "Evidence stage is required");
         ObjectNode root = json.createObjectNode();
         root.put("schema_version", SCHEMA_VERSION);
         root.put("evidence_cutoff", cutoff.toString());
@@ -82,13 +95,13 @@ final class StageOneIntelligenceEvidenceCollector {
                 .distinct()
                 .toList();
         if (distinct.isEmpty()) return root;
-        writer.begin(distinct);
-        runParallel(distinct, cutoff, brokerContext, writer).forEach(stocks::add);
+        stage.begin(distinct);
+        runParallel(distinct, cutoff, brokerContext, stage).forEach(stocks::add);
         return root;
     }
 
     private List<ObjectNode> runParallel(List<String> symbols, Instant cutoff, BrokerContext brokerContext,
-            EvidenceWriter writer) {
+            EvidenceStage stage) {
         Map<EvidenceDomain, ExecutorService> groups = new EnumMap<>(EvidenceDomain.class);
         ExecutorService collators = Executors.newFixedThreadPool(COLLATOR_THREADS, threads("stage1-collator"));
         try {
@@ -98,13 +111,13 @@ final class StageOneIntelligenceEvidenceCollector {
             }
             List<CompletableFuture<ObjectNode>> packages = new ArrayList<>();
             for (String symbol : symbols) {
-                Map<EvidenceDomain, CompletableFuture<ArrayNode>> fetches = new EnumMap<>(EvidenceDomain.class);
+                Map<EvidenceDomain, CompletableFuture<Void>> writes = new EnumMap<>(EvidenceDomain.class);
                 for (EvidenceDomain domain : EvidenceDomain.values()) {
-                    fetches.put(domain, CompletableFuture.supplyAsync(
-                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, writer), groups.get(domain)));
+                    writes.put(domain, CompletableFuture.runAsync(
+                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, stage), groups.get(domain)));
                 }
-                packages.add(CompletableFuture.allOf(fetches.values().toArray(CompletableFuture[]::new))
-                        .thenApplyAsync(done -> stock(symbol, fetches), collators));
+                packages.add(CompletableFuture.allOf(writes.values().toArray(CompletableFuture[]::new))
+                        .thenApplyAsync(done -> collate(symbol, stage), collators));
             }
             awaitAll(packages);
             return packages.stream().map(CompletableFuture::join).toList();
@@ -114,14 +127,13 @@ final class StageOneIntelligenceEvidenceCollector {
         }
     }
 
-    private ArrayNode fetchAndWrite(String symbol, EvidenceDomain domain, Instant cutoff,
-            BrokerContext brokerContext, EvidenceWriter writer) {
+    private void fetchAndWrite(String symbol, EvidenceDomain domain, Instant cutoff,
+            BrokerContext brokerContext, EvidenceStage stage) {
         ArrayNode values = json.createArrayNode();
         connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff, brokerContext, null,
                         Map.of()))
                 .forEach(value -> values.add(provider(value)));
-        writer.write(symbol, domain, values);
-        return values;
+        stage.write(symbol, domain, values);
     }
 
     /** Waits for every future, then rethrows the first failure with its original type. */
@@ -145,9 +157,12 @@ final class StageOneIntelligenceEvidenceCollector {
         };
     }
 
-    private ObjectNode stock(String symbol, Map<EvidenceDomain, CompletableFuture<ArrayNode>> fetches) {
+    private ObjectNode collate(String symbol, EvidenceStage stage) {
+        Map<EvidenceDomain, ArrayNode> stored = stage.read(symbol);
         Map<EvidenceDomain, ArrayNode> evidence = new EnumMap<>(EvidenceDomain.class);
-        fetches.forEach((domain, fetch) -> evidence.put(domain, fetch.join()));
+        for (EvidenceDomain domain : EvidenceDomain.values()) {
+            evidence.put(domain, stored.getOrDefault(domain, json.createArrayNode()));
+        }
 
         ObjectNode stock = json.createObjectNode();
         stock.put("symbol", symbol);

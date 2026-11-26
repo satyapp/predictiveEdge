@@ -15,7 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Applies every migration to an empty PostgreSQL 16 database, so a broken migration fails the build. */
 class FlywayMigrationIntegrationTest {
-    private static final int EXPECTED_MIGRATIONS = 18;
+    private static final int EXPECTED_MIGRATIONS = 21;
     private static final int MARKET_INTELLIGENCE_TABLES = 42;
 
     private static PostgreSQLContainer<?> postgres;

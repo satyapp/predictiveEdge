@@ -22,7 +22,7 @@ class StageOneActivityStoreTest {
     @Test
     void screenerSearchRejectsTheSameSymbolTwice() {
         assertThatThrownBy(() -> new ScreenerSearch(UUID.randomUUID(), UUID.randomUUID(),
-                SearchEvidenceCategory.TOP_GAINERS, MarketScreenType.TOP_GAINERS, "", "", "", LocalDate.of(2026, 11, 25),
+                SearchEvidenceCategory.TOP_GAINERS, "TOP_GAINERS", "", "", "", LocalDate.of(2026, 11, 25),
                 "account-1", "{}", NOW, List.of(new ScreenerRow("infy", 1, "{}"), new ScreenerRow("INFY", 2, "{}"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("same symbol twice");

@@ -5,9 +5,10 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import org.predictiveedge.chart.domain.MarketScreenType;
+import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 
 /**
  * Persists the user's Stage-1 activity: one screener run with every row it returned, the stocks selected from
@@ -28,11 +29,34 @@ public interface StageOneActivityStore {
     /** Writes the intraday list. Every selection must belong to the user and already have Stage-1 analysis. */
     void recordIntradayList(IntradayListSave list);
 
+    /** The selections of one search made by one user, keyed by symbol. */
+    Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId);
+
     /**
      * Writes the selected stocks of one screener run without evidence or analysis. Evidence rows reference their
      * selection, so this must run before {@link #recordEvidence} for those stocks.
      */
     void recordSelectedStocks(SelectionStart start);
+
+    /**
+     * Writes the Stage-1 AI analysis of a stock that is already selected. A second analysis of the same selection is
+     * rejected.
+     */
+    void recordAnalysis(UUID selectionId, StageOneAnalysisInput analysis);
+
+    /**
+     * Reads the evidence recorded for one selection as a JSON object keyed by evidence domain. Each value is the JSON
+     * array of that domain's provider evidence, in the same shape {@link #recordEvidence} accepts. Every domain is
+     * present, and a domain with no rows maps to an empty array.
+     */
+    String evidenceByDomainJson(UUID selectionId);
+
+    /**
+     * The pre-open row of one stock for the trading day of a search: the stock's row in the user's most recent
+     * pre-open run on that day. Empty when the search is unknown, no pre-open run exists for that day, or the stock
+     * is not in the run.
+     */
+    java.util.Optional<PreOpenRow> preOpenRowForSearch(UUID userId, UUID searchId, String symbol);
 
     /**
      * Writes one data type's evidence for one selected stock. {@code evidenceJson} is the JSON array of that domain's
@@ -71,14 +95,15 @@ public interface StageOneActivityStore {
         }
     }
 
-    record ScreenerSearch(UUID searchId, UUID userId, SearchEvidenceCategory category, MarketScreenType screenType,
+    /** {@code screenType} is the screen's name, such as TOP_GAINERS or PRE_OPEN. */
+    record ScreenerSearch(UUID searchId, UUID userId, SearchEvidenceCategory category, String screenType,
             String setup, String universe, String timeframe, LocalDate tradingDate, String brokerAccountId,
             String criteriaJson, Instant searchedAt, List<ScreenerRow> rows) {
         public ScreenerSearch {
             Objects.requireNonNull(searchId, "Search id is required");
             Objects.requireNonNull(userId, "User id is required");
             Objects.requireNonNull(category, "Search category is required");
-            Objects.requireNonNull(screenType, "Screen type is required");
+            screenType = required(screenType, "Screen type");
             Objects.requireNonNull(tradingDate, "Trading date is required");
             Objects.requireNonNull(searchedAt, "Search time is required");
             setup = trimmed(setup);
@@ -91,7 +116,16 @@ public interface StageOneActivityStore {
         }
     }
 
-    record ScreenerRow(String symbol, int screenRank, String brokerRowJson) {
+    /** One stock's row in a pre-open run, with the CSV columns of that row when they were stored. */
+    record PreOpenRow(UUID preOpenSearchId, LocalDate tradingDate, String symbol, int screenRank,
+            String brokerRowJson, PreOpenAuctionDetail detail, Instant storedAt) { }
+
+    /** One screener row. {@code preOpenDetail} is set only for PRE_OPEN rows parsed from the NSE pre-open CSV. */
+    record ScreenerRow(String symbol, int screenRank, String brokerRowJson, PreOpenAuctionDetail preOpenDetail) {
+        public ScreenerRow(String symbol, int screenRank, String brokerRowJson) {
+            this(symbol, screenRank, brokerRowJson, null);
+        }
+
         public ScreenerRow {
             symbol = normalizedSymbol(symbol);
             if (screenRank < 1) throw new IllegalArgumentException("Screen rank must be positive");

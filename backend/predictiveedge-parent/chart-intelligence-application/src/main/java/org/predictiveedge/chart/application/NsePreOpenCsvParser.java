@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 import org.predictiveedge.chart.domain.PreOpenSnapshot;
 
 /** Strict parser for NSE's downloadable pre-open market CSV. */
@@ -33,11 +34,27 @@ public final class NsePreOpenCsvParser {
             String symbol = row.isEmpty() ? "ROW_" + (index + 1) : row.getFirst().trim();
             try {
                 if (row.size() != width) throw new IllegalArgumentException("invalid column count");
+                BigDecimal previousClose = decimal(row, columns, "PREV. CLOSE");
+                BigDecimal finalPrice = decimal(row, columns, "FINAL PRICE");
+                long finalVolume = whole(row, columns, "FINAL VOLUME");
+                BigDecimal tradedValue = decimal(row, columns, "VALUE");
+                BigDecimal bestBid = decimal(row, columns, "BEST BID PRICE");
+                BigDecimal bestAsk = decimal(row, columns, "BEST ASK PRICE");
+                var detail = new PreOpenAuctionDetail(previousClose, bestBid,
+                        optionalWhole(row, columns, "BEST BID QTY"), bestAsk,
+                        optionalWhole(row, columns, "BEST ASK QTY"),
+                        optionalDecimal(row, columns, "INDICATIVE EQUILIBRIUM PRICE"),
+                        optionalWhole(row, columns, "INDICATIVE EQUILIBRIUM QUANTITY"),
+                        optionalDecimal(row, columns, "CHANGE"),
+                        optionalDecimal(row, columns, "%CHANGE"), finalPrice, finalVolume, tradedValue,
+                        optionalDecimal(row, columns, "FFM CAP"),
+                        optionalWhole(row, columns, "INDICATIVE IMBALANCE QUANTITY AT EQUILIBRIUM PRICE"),
+                        optionalWhole(row, columns, "INDICATIVE IMBALANCE QUANTITY AT MARKET ORDER"),
+                        optionalDecimal(row, columns, "52 WEEK HIGH"),
+                        optionalDecimal(row, columns, "52 WEEK LOW"));
                 accepted.add(new PreOpenSnapshot("NSE", cell(row, columns, "SYMBOL"), "EQ",
-                        decimal(row, columns, "PREV. CLOSE"), decimal(row, columns, "FINAL PRICE"),
-                        whole(row, columns, "FINAL VOLUME"), decimal(row, columns, "VALUE"),
-                        decimal(row, columns, "BEST BID PRICE"), decimal(row, columns, "BEST ASK PRICE"),
-                        observedAt));
+                        previousClose, finalPrice, finalVolume, tradedValue, bestBid, bestAsk,
+                        observedAt, detail));
             } catch (RuntimeException invalid) {
                 rejected.add(new RowRejection(index + 1, symbol, invalid.getMessage()));
             }
@@ -63,6 +80,34 @@ public final class NsePreOpenCsvParser {
     private static long whole(List<String> row, Map<String, Integer> columns, String name) {
         try {
             return Long.parseLong(cell(row, columns, name).replace(",", ""));
+        } catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException(name + " is not a whole number");
+        }
+    }
+
+    /** Returns the cell, or null when the column is missing from the CSV or the exchange reported it as "-" or blank. */
+    private static String optionalCell(List<String> row, Map<String, Integer> columns, String name) {
+        Integer index = columns.get(name);
+        if (index == null) return null;
+        String value = row.get(index).trim();
+        return value.isEmpty() || "-".equals(value) ? null : value.replace(",", "");
+    }
+
+    private static BigDecimal optionalDecimal(List<String> row, Map<String, Integer> columns, String name) {
+        String value = optionalCell(row, columns, name);
+        if (value == null) return null;
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException(name + " is not numeric");
+        }
+    }
+
+    private static Long optionalWhole(List<String> row, Map<String, Integer> columns, String name) {
+        String value = optionalCell(row, columns, name);
+        if (value == null) return null;
+        try {
+            return Long.parseLong(value);
         } catch (NumberFormatException invalid) {
             throw new IllegalArgumentException(name + " is not a whole number");
         }
