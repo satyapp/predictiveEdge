@@ -49,9 +49,12 @@ public final class FyersHistoricalDataProvider implements HistoricalMarketDataPr
         Instant cursor = request.from();
         while (cursor.isBefore(request.to())) {
             Instant end = earlier(cursor.plus(maximumWindow), request.to());
+            // FYERS returns a partial candle for the minute in progress, so the last window ends at the previous minute.
+            Instant rangeTo = end.equals(request.to()) ? completedMinute(end) : end;
+            if (!rangeTo.isAfter(cursor)) break;
             JsonNode response;
             try {
-                response = client.history(auth, parameters(providerSymbol, request, cursor, end));
+                response = client.history(auth, parameters(providerSymbol, request, cursor, rangeTo));
             } catch (IllegalStateException failure) {
                 throw new BrokerFailure(BrokerFailure.Code.CONNECTION_UNAVAILABLE,
                         "FYERS historical-data request failed: " + message(failure));
@@ -101,6 +104,10 @@ public final class FyersHistoricalDataProvider implements HistoricalMarketDataPr
 
     private static BigDecimal decimal(JsonNode row, int index) { return row.get(index).decimalValue(); }
     private static Instant earlier(Instant left, Instant right) { return left.isBefore(right) ? left : right; }
+    /** The start of the previous whole minute: the last minute FYERS has finished writing. */
+    static Instant completedMinute(Instant time) {
+        return time.truncatedTo(java.time.temporal.ChronoUnit.MINUTES).minus(Duration.ofMinutes(1));
+    }
     private static String message(Throwable failure) {
         return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
     }

@@ -77,7 +77,7 @@ public final class FyersConnectionService {
         parameters.put("resolution", "D");
         parameters.put("date_format", "0");
         parameters.put("range_from", Long.toString(now.minus(Duration.ofDays(10)).getEpochSecond()));
-        parameters.put("range_to", Long.toString(now.getEpochSecond()));
+        parameters.put("range_to", Long.toString(FyersHistoricalDataProvider.completedMinute(now).getEpochSecond()));
         parameters.put("cont_flag", "0");
         parameters.put("oi_flag", "0");
         var history = client.history(auth, parameters);
