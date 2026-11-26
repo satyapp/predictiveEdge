@@ -57,14 +57,9 @@ export type StageOneGoldenCopy = {
 
 export type PreOpenAnalysisResponse = {
   authority: 'PRELIMINARY_NOT_FINAL';
-  deterministic: {
-    parsedSnapshots: number;
-    shortlistedForHistory: number;
-    analyses: HistoricalSetupAnalysis[];
-    candidates: HistoricalSetupAnalysis[];
-    failures: { venue: string; symbol: string; reason: string }[];
-    rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
-  };
+  parsedRows: number;
+  savedRows: number;
+  rejectedRows: { rowNumber: number; symbol: string; reason: string }[];
   searchId: string;
 };
 
@@ -73,16 +68,11 @@ export async function analyzePreOpenCsv(input: {
   brokerAccountId: string;
   tradingDate: string;
   file: File;
-  historyDays?: number;
-  maximumCandidates?: number;
 }) {
   const form = new FormData();
   form.set('brokerAccountId', input.brokerAccountId);
   form.set('tradingDate', input.tradingDate);
   form.set('observedAt', `${input.tradingDate}T09:09:30+05:30`);
-  form.set('analysisCutoff', `${input.tradingDate}T09:10:00+05:30`);
-  form.set('historyDays', String(input.historyDays ?? 365));
-  form.set('maximumCandidates', String(input.maximumCandidates ?? 10));
   form.set('file', input.file);
   const response = await fetch('/api/chart-intelligence/v1/pre-open-csv-analyses', {
     method: 'POST',

@@ -127,13 +127,8 @@ public class ChartIntelligenceInfrastructureConfiguration {
 
     @Bean
     PreOpenCsvAnalysisService preOpenCsvAnalysisService(
-            NsePreOpenCsvParser parser,
-            LiveMarketDataInstrumentResolver instruments,
-            HistoricalMarketDataProvider history,
-            PreOpenAuctionPublicationPort publications,
-            PreOpenIntradayAnalyzer analyzer) {
-        return new PreOpenCsvAnalysisService(parser, instruments, history, publications, analyzer,
-                Clock.systemUTC());
+            NsePreOpenCsvParser parser, PreOpenAuctionPublicationPort publications) {
+        return new PreOpenCsvAnalysisService(parser, publications, Clock.systemUTC());
     }
 
     @Bean

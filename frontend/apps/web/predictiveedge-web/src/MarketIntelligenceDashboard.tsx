@@ -40,16 +40,11 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
 
   const hasResult = Boolean(preOpenResult || screenResult);
   const selectedCategory = categories.find((value) => value.value === category)!;
-  // Pre-open is deterministic only: its candidates are the rule-based setups from the Zerodha history check.
-  const preOpenCandidates = preOpenResult?.deterministic.candidates ?? [];
-  const candidateCount = preOpenResult ? preOpenCandidates.length : screenResult?.ollama.candidates.length ?? 0;
+  const candidateCount = preOpenResult ? 0 : screenResult?.ollama.candidates.length ?? 0;
   const goldenCopy = screenResult?.goldenCopy;
   const screenFacts = useMemo(() => new Map(screenResult?.deterministic.analyses.map((value) => [value.assessment.symbol, value])), [screenResult]);
   const screenRankings = useMemo(() => new Map(screenResult?.deterministic.ranking.candidates.map((value) => [value.symbol, value])), [screenResult]);
-  const candidateSummaries: { rank: number; symbol: string; label: string; tone: string }[] = preOpenResult ? preOpenCandidates.map((value, index) => ({
-    rank: index + 1, symbol: value.assessment.symbol, label: value.assessment.action.replace(/_/g, ' '),
-    tone: value.assessment.action === 'BUY_CANDIDATE' ? 'buy' : value.assessment.action === 'SELL_CANDIDATE' ? 'sell' : 'wait',
-  })) : screenResult?.ollama.candidates.map((value, index) => ({
+  const candidateSummaries: { rank: number; symbol: string; label: string; tone: string }[] = preOpenResult ? [] : screenResult?.ollama.candidates.map((value, index) => ({
     rank: screenRankings.get(value.symbol)?.rank ?? index + 1, symbol: value.symbol, label: value.stance.replace('_', ' '),
     tone: value.stance === 'LONG_WATCH' ? 'buy' : value.stance === 'SHORT_WATCH' ? 'sell' : 'wait',
   })) ?? [];
@@ -71,7 +66,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       const detail = await loadAnalysisHistoryDetail(session.accessToken, run.runId);
       setCategory(detail.category as AnalysisCategory); setPreOpenResult(undefined); setScreenResult(undefined);
       if (detail.resultKind === 'PRE_OPEN_FULL' || detail.resultKind === 'PRE_OPEN_DETERMINISTIC') {
-        if (!('deterministic' in detail.result)) throw new Error('This saved pre-open run predates the current format and cannot be reopened.');
+        if (!('savedRows' in detail.result)) throw new Error('This saved pre-open run predates the current format and cannot be reopened.');
         setPreOpenResult(detail.result as PreOpenAnalysisResponse);
       }
       else if (detail.resultKind === 'MARKET_SCREEN_FULL') setScreenResult(detail.result as MarketScreenAnalysisResponse);
@@ -90,7 +85,7 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       if (category === 'PRE_OPEN') {
         setPreOpenResult(await analyzePreOpenCsv({
           accessToken: session.accessToken, brokerAccountId: broker.zerodhaAccountId,
-          tradingDate, file, maximumCandidates,
+          tradingDate, file,
         }));
       } else {
         setScreenResult(await analyzeMarketScreenCsv({
@@ -151,22 +146,23 @@ export function MarketIntelligenceDashboard({ session, broker }: { session: Auth
       {error && <p className="error" role="alert">{error}</p>}
 
       {hasResult && <div className="unified-report">
-        <div className="report-heading"><div><h3>Analysis Result — Stage‑1 Report</h3><p>{selectedCategory.label} · {candidateCount} candidates{loadedFromHistory ? ' · opened from saved history' : ' · saved to history'}</p></div><span className="completed">✓ Completed</span><div className="model-flow"><b>Ollama · Stage‑1</b><span>+</span><b className="future">OpenAI · Stage‑2</b></div></div>
+        <div className="report-heading"><div><h3>Analysis Result — Stage‑1 Report</h3><p>{selectedCategory.label} · {preOpenResult ? `${preOpenResult.savedRows} rows saved` : `${candidateCount} candidates`}{loadedFromHistory ? ' · opened from saved history' : preOpenResult ? '' : ' · saved to history'}</p></div><span className="completed">✓ Completed</span><div className="model-flow"><b>Ollama · Stage‑1</b><span>+</span><b className="future">OpenAI · Stage‑2</b></div></div>
         <div className="report-tabs">
-          {(['CANDIDATES', 'STAGE_ONE', 'STAGE_TWO', 'COMPARE'] as ResultTab[]).map((tab) => <button type="button" key={tab} className={resultTab === tab ? 'active' : ''} disabled={(tab === 'STAGE_TWO' || tab === 'COMPARE') && true} onClick={() => setResultTab(tab)}>{tab === 'CANDIDATES' ? `Candidate List (${candidateCount})` : tab === 'STAGE_ONE' ? (preOpenResult ? 'Historical Setups' : 'Ollama Analysis (Stage‑1)') : tab === 'STAGE_TWO' ? 'Combined Analysis (Stage‑2) · Planned' : 'Side-by-Side Compare · Planned'}</button>)}
+          {(['CANDIDATES', 'STAGE_ONE', 'STAGE_TWO', 'COMPARE'] as ResultTab[]).map((tab) => <button type="button" key={tab} className={resultTab === tab ? 'active' : ''} disabled={(tab === 'STAGE_TWO' || tab === 'COMPARE') && true} onClick={() => setResultTab(tab)}>{tab === 'CANDIDATES' ? `Candidate List (${candidateCount})` : tab === 'STAGE_ONE' ? (preOpenResult ? 'Saved Rows' : 'Ollama Analysis (Stage‑1)') : tab === 'STAGE_TWO' ? 'Combined Analysis (Stage‑2) · Planned' : 'Side-by-Side Compare · Planned'}</button>)}
         </div>
 
+        {resultTab === 'CANDIDATES' && preOpenResult && <p className="score-warning">Pre-open rows are saved as evidence. Stage 1 runs on the stocks you select from a top-gainers search, and each one reads its pre-open row from this run.</p>}
         {resultTab === 'CANDIDATES' && <div className="candidate-list-summary">{candidateSummaries.map((candidate) => <button type="button" key={candidate.symbol} onClick={() => setResultTab('STAGE_ONE')}><span>#{candidate.rank}</span><b>{candidate.symbol}</b><em className={candidate.tone}>{candidate.label}</em><i>›</i></button>)}</div>}
 
         {resultTab === 'STAGE_ONE' && <>
           {screenResult && <div className="ollama-overview"><div><small>STAGE‑1 MODEL</small><b>{screenResult.ollama.model}</b></div><span className={`tone ${screenResult.ollama.marketTone.toLowerCase()}`}>{screenResult.ollama.marketTone}</span><p>{screenResult.ollama.overview}</p></div>}
-          <div className="analysis-meta"><span><b>{preOpenResult?.deterministic.parsedSnapshots ?? screenResult?.deterministic.parsedRows}</b> usable rows</span><span><b>{preOpenResult?.deterministic.shortlistedForHistory ?? screenResult?.deterministic.analyses.length ?? 0}</b> Zerodha histories</span><span><b>{preOpenResult?.deterministic.failures.length ?? screenResult?.deterministic.failures.length ?? 0}</b> failures</span><span><b>{candidateCount}</b> recommendations</span>{goldenCopy && <span title={goldenCopy.sourceFingerprint}><b>12</b> modules · golden copy {goldenCopy.sourceFingerprint.slice(0, 10)}…</span>}</div>
+          <div className="analysis-meta">{preOpenResult ? <><span><b>{preOpenResult.parsedRows}</b> rows read</span><span><b>{preOpenResult.savedRows}</b> rows saved</span><span><b>{preOpenResult.rejectedRows.length}</b> rejected</span></> : <><span><b>{screenResult?.deterministic.parsedRows}</b> usable rows</span><span><b>{screenResult?.deterministic.analyses.length ?? 0}</b> Zerodha histories</span><span><b>{screenResult?.deterministic.failures.length ?? 0}</b> failures</span><span><b>{candidateCount}</b> recommendations</span></>}{goldenCopy && <span title={goldenCopy.sourceFingerprint}><b>12</b> modules · golden copy {goldenCopy.sourceFingerprint.slice(0, 10)}…</span>}</div>
           <div className="risk-controls"><div><small>ILLUSTRATIVE POSITION-SIZE INPUTS</small><b>Set the maximum loss budget before reviewing a setup</b><p>Margin, slippage, correlation and portfolio exposure remain outside this calculator.</p></div><label>Capital (₹)<input type="number" min="1" step="1000" value={capital} onChange={(event) => setCapital(Number(event.target.value))} /></label><label>Risk per trade (%)<input type="number" min="0.05" max="5" step="0.05" value={riskPercent} onChange={(event) => setRiskPercent(Number(event.target.value))} /></label></div>
           <div className="decision-list">
-            {preOpenCandidates.map((value) => <div className="diagnostic-row" key={value.assessment.symbol}><span>{value.assessment.symbol}</span><span>{value.assessment.action.replace(/_/g, ' ')}</span><span>{value.assessment.setupType.replace(/_/g, ' ')} · gap {value.assessment.gapPercent.toFixed(2)}% · {value.assessment.reasons.join(' · ')}</span></div>)}
+            
             {screenResult?.ollama.candidates.map((candidate) => <MarketScreenDecisionCard key={candidate.symbol} candidate={candidate} facts={screenFacts.get(candidate.symbol)} ranking={screenRankings.get(candidate.symbol)} screenType={screenResult.deterministic.screenType} capital={capital} riskPercent={riskPercent} />)}
           </div>
-          {preOpenResult && preOpenResult.deterministic.failures.length > 0 && <div className="failure-block"><b>Historical analysis failures</b>{preOpenResult.deterministic.failures.map((value) => <div className="diagnostic-row" key={`${value.venue}:${value.symbol}`}><span>{value.symbol}</span><span>FAILED</span><span>{value.reason}</span></div>)}</div>}
+          {preOpenResult && preOpenResult.rejectedRows.length > 0 && <div className="failure-block"><b>Rejected rows</b>{preOpenResult.rejectedRows.map((value) => <div className="diagnostic-row" key={value.rowNumber}><span>Row {value.rowNumber}{value.symbol ? ` · ${value.symbol}` : ''}</span><span>REJECTED</span><span>{value.reason}</span></div>)}</div>}
           {screenResult && screenResult.deterministic.failures.length > 0 && <div className="failure-block"><b>Historical analysis failures</b>{screenResult.deterministic.failures.map((value) => <div className="diagnostic-row" key={`${value.venue}:${value.symbol}`}><span>{value.symbol}</span><span>FAILED</span><span>{value.reason}</span></div>)}</div>}
         </>}
         <div className="stage-two-callout"><div><b>Stage‑2 OpenAI refinement</b><p>Phase 2 will receive the persisted golden copy: all 12 module evidence views plus the complete Ollama Stage‑1 analysis. It will not re-query connectors, Zerodha, or the source CSV.</p></div><button type="button" disabled>Run Advanced Analysis · Phase 2</button></div>
