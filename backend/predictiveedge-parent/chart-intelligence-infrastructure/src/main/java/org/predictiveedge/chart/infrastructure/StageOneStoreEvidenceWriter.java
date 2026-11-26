@@ -1,10 +1,12 @@
 package org.predictiveedge.chart.infrastructure;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,10 +20,11 @@ import org.predictiveedge.chart.application.StageOneActivityStore.StockSelection
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
 
 /**
- * Persists the collector's results through the Stage-1 store. {@link #begin} records one selection per stock, then
- * each {@link #write} records one data type for one stock. Every store call is one transaction.
+ * The database-backed {@link EvidenceStage}. {@link #begin} records one selection per stock, each {@link #write}
+ * records one data type for one stock, and {@link #read} loads a stock's stored evidence back for collation. Every
+ * store call is one transaction. Methods are thread-safe.
  */
-final class StageOneStoreEvidenceWriter implements EvidenceWriter {
+final class StageOneStoreEvidenceWriter implements EvidenceStage {
     private final StageOneActivityStore store;
     private final ObjectMapper json;
     private final UUID searchId;
@@ -50,14 +53,36 @@ final class StageOneStoreEvidenceWriter implements EvidenceWriter {
 
     @Override
     public void write(String symbol, EvidenceDomain domain, ArrayNode evidence) {
-        UUID selectionId = selectionIds.get(symbol);
-        if (selectionId == null) throw new IllegalStateException(symbol + " has no recorded selection");
-        store.recordEvidence(new EvidenceSave(selectionId, domain.name(), write(evidence)));
+        store.recordEvidence(new EvidenceSave(selectionId(symbol), domain.name(), write(evidence)));
+    }
+
+    @Override
+    public Map<EvidenceDomain, ArrayNode> read(String symbol) {
+        String byDomain = store.evidenceByDomainJson(selectionId(symbol));
+        JsonNode root;
+        try {
+            root = json.readTree(byDomain);
+        } catch (JsonProcessingException failure) {
+            throw new IllegalStateException("Stored evidence could not be read", failure);
+        }
+        Map<EvidenceDomain, ArrayNode> evidence = new EnumMap<>(EvidenceDomain.class);
+        root.fields().forEachRemaining(entry -> {
+            if (!(entry.getValue() instanceof ArrayNode values))
+                throw new IllegalStateException("Stored evidence for " + entry.getKey() + " is not an array");
+            evidence.put(EvidenceDomain.valueOf(entry.getKey()), values);
+        });
+        return evidence;
     }
 
     /** The selection id recorded for each stock, after {@link #begin} has run. */
     Map<String, UUID> selectionIds() {
         return Map.copyOf(selectionIds);
+    }
+
+    private UUID selectionId(String symbol) {
+        UUID selectionId = selectionIds.get(symbol);
+        if (selectionId == null) throw new IllegalStateException(symbol + " has no recorded selection");
+        return selectionId;
     }
 
     private String write(ArrayNode evidence) {

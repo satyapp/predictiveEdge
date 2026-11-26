@@ -22,6 +22,8 @@ import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
+import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneAiResult;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
 
@@ -42,22 +44,39 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
     private final int outputTokens; private final Clock clock;
     private final StageOneIntelligenceEvidenceCollector intelligence;
     private final StageOneGoldenCopyFactory goldenCopies;
+    private final StageOneActivityStore store;
 
+    /** {@code store} may be null, in which case no run is saved even when the caller names one. */
     public OllamaMarketScreenAnalysisAdapter(ObjectMapper json, HttpClient http, URI endpoint, String model,
             Duration timeout, int contextTokens, int outputTokens, Clock clock,
-            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies,
+            StageOneActivityStore store) {
         this.json = Objects.requireNonNull(json); this.http = Objects.requireNonNull(http);
         this.endpoint = Objects.requireNonNull(endpoint); this.model = required(model, "Model");
         this.timeout = Objects.requireNonNull(timeout); this.contextTokens = contextTokens;
         this.outputTokens = outputTokens; this.clock = Objects.requireNonNull(clock);
         this.intelligence = Objects.requireNonNull(intelligence);
         this.goldenCopies = Objects.requireNonNull(goldenCopies);
+        this.store = store;
     }
 
+    /**
+     * Fetches evidence for every candidate in parallel, collates each stock from its stored evidence, then asks the
+     * model. With a run, the candidates are saved as selections of that run before fetching, and each candidate's
+     * analysis is saved after the model answers.
+     */
     @Override
     public StageOneAiResult analyze(UUID userId, String brokerAccountId,
-            MarketScreenHistoricalAnalysisService.Result result) {
-        String evidenceJson = write(compact(result, BrokerContext.withoutCredentials(userId, brokerAccountId)));
+            MarketScreenHistoricalAnalysisService.Result result, ScreenerRunRecorder.ScreenerRun run) {
+        BrokerContext brokerContext = BrokerContext.withoutCredentials(userId, brokerAccountId);
+        StageOneStoreEvidenceWriter saved = run == null || store == null ? null
+                : new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(),
+                        clock.instant());
+        EvidenceStage stage = saved == null ? new InMemoryEvidenceStage() : saved;
+        ObjectNode evidence = intelligence.collect(
+                result.ranking().candidates().stream().map(value -> value.symbol()).toList(),
+                result.analyzedAt(), brokerContext, stage);
+        String evidenceJson = write(compact(result, evidence));
         Map<String, String> expected = new LinkedHashMap<>();
         result.ranking().candidates().forEach(value -> expected.put(value.symbol(), "INSUFFICIENT_EVIDENCE"));
         result.analyses().forEach(value -> expected.put(value.assessment().symbol(), stance(value.assessment().action())));
@@ -85,10 +104,24 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             var candidates = reconcileCandidates(content, expected, cautions);
             var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
                     content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
+            if (saved != null) recordAnalyses(saved, analysis);
             return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt(); throw new IllegalStateException("Ollama analysis was interrupted", failure);
         } catch (IOException failure) { throw new IllegalStateException("Ollama analysis is unavailable", failure); }
+    }
+
+    /** Saves each candidate's interpretation against its selection. Candidates without a selection are skipped. */
+    private void recordAnalyses(StageOneStoreEvidenceWriter saved, PreOpenOllamaAnalysis analysis) {
+        String analysisJson = write(analysis);
+        Map<String, UUID> selections = saved.selectionIds();
+        for (PreOpenOllamaAnalysis.CandidateInterpretation candidate : analysis.candidates()) {
+            UUID selectionId = selections.get(candidate.symbol());
+            if (selectionId == null) continue;
+            store.recordAnalysis(selectionId, new StageOneActivityStore.StageOneAnalysisInput(candidate.stance(),
+                    candidate.thesis(), candidate.confirmation(), candidate.risk(), analysis.model(),
+                    analysis.generatedAt(), analysisJson));
+        }
     }
 
     /** Keeps deterministic identity and direction authoritative without discarding useful model explanations. */
@@ -139,7 +172,7 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
         return symbol;
     }
 
-    private ObjectNode compact(MarketScreenHistoricalAnalysisService.Result result, BrokerContext brokerContext) {
+    private ObjectNode compact(MarketScreenHistoricalAnalysisService.Result result, ObjectNode evidence) {
         ObjectNode root = json.createObjectNode(); root.put("authority", result.authority());
         root.put("screen_type", result.screenType().name()); root.put("ranking_score_version", result.ranking().scoreVersion());
         Map<String, org.predictiveedge.chart.domain.MarketScreenTechnicalAssessment> assessments = result.analyses()
@@ -170,9 +203,7 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             node.put("confirmation_rule", assessment.confirmationRule());
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
-        root.set("intelligence_evidence", intelligence.collect(
-                result.ranking().candidates().stream().map(value -> value.symbol()).toList(),
-                result.analyzedAt(), brokerContext));
+        root.set("intelligence_evidence", evidence);
         return root;
     }
 

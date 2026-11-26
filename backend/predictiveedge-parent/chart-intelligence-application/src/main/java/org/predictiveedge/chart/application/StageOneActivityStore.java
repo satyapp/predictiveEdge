@@ -35,6 +35,19 @@ public interface StageOneActivityStore {
     void recordSelectedStocks(SelectionStart start);
 
     /**
+     * Writes the Stage-1 AI analysis of a stock that is already selected. A second analysis of the same selection is
+     * rejected.
+     */
+    void recordAnalysis(UUID selectionId, StageOneAnalysisInput analysis);
+
+    /**
+     * Reads the evidence recorded for one selection as a JSON object keyed by evidence domain. Each value is the JSON
+     * array of that domain's provider evidence, in the same shape {@link #recordEvidence} accepts. Every domain is
+     * present, and a domain with no rows maps to an empty array.
+     */
+    String evidenceByDomainJson(UUID selectionId);
+
+    /**
      * Writes one data type's evidence for one selected stock. {@code evidenceJson} is the JSON array of that domain's
      * provider evidence, as the collector produces it. The selection must already be recorded.
      */

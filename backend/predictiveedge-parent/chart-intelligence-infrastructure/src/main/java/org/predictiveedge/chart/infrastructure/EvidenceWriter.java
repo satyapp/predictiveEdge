@@ -6,14 +6,6 @@ import org.predictiveedge.intelligence.connector.EvidenceDomain;
 
 /** Receives each fetched data type so it can be persisted before the stock is collated. */
 interface EvidenceWriter {
-    /** Writes nothing. Used when the evidence is only returned in memory. */
-    EvidenceWriter DISCARD = new EvidenceWriter() {
-        @Override
-        public void write(String symbol, EvidenceDomain domain, ArrayNode evidence) {
-            // Intentionally empty.
-        }
-    };
-
     /** Runs once, on the calling thread, before any worker starts. The symbols are distinct and normalized. */
     default void begin(List<String> symbols) {
         // Nothing to prepare by default.

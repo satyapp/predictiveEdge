@@ -40,4 +40,11 @@ public abstract class EvidenceRow {
         this.payload = payload;
         this.detail = detail;
     }
+
+    public String source() { return key.source(); }
+    public String role() { return role; }
+    public String status() { return status; }
+    public Instant fetchedAt() { return fetchedAt; }
+    public String payload() { return payload; }
+    public String detail() { return detail; }
 }

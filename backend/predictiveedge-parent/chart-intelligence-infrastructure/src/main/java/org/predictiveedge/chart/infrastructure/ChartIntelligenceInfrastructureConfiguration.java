@@ -17,6 +17,8 @@ import org.predictiveedge.chart.application.MarketScreenCsvParser;
 import org.predictiveedge.chart.application.MarketScreenCsvParserRegistry;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenCandidateConfirmationService;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
+import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.PreOpenIntradayAnalysisService;
 import org.predictiveedge.chart.domain.PreOpenCandidateRanker;
 import org.predictiveedge.chart.domain.MarketScreenCandidateRanker;
@@ -38,6 +40,11 @@ public class ChartIntelligenceInfrastructureConfiguration {
     StageOneIntelligenceEvidenceCollector stageOneIntelligenceEvidenceCollector(
             IntelligenceDataConnector connector, ObjectMapper json) {
         return new StageOneIntelligenceEvidenceCollector(connector, json);
+    }
+
+    @Bean
+    ScreenerRunRecorder screenerRunRecorder(StageOneActivityStore store) {
+        return new ScreenerRunRecorder(store);
     }
 
     @Bean
@@ -161,10 +168,11 @@ public class ChartIntelligenceInfrastructureConfiguration {
             @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
             @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
             @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
-            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
+            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies,
+            StageOneActivityStore store) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         return new OllamaMarketScreenAnalysisAdapter(json,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), endpoint, model,
-                timeout, contextTokens, outputTokens, Clock.systemUTC(), intelligence, goldenCopies);
+                timeout, contextTokens, outputTokens, Clock.systemUTC(), intelligence, goldenCopies, store);
     }
 }

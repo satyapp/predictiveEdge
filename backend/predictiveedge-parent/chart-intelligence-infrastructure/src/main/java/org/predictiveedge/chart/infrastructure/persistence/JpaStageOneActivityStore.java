@@ -3,9 +3,12 @@ package org.predictiveedge.chart.infrastructure.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -154,6 +157,35 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
     }
 
     @Override
+    public void recordAnalysis(UUID selectionId, StageOneAnalysisInput analysis) {
+        readObject(analysis.analysisJson(), "Analysis JSON");
+        transactions.executeWithoutResult(status -> {
+            if (!selectedStocks.existsById(selectionId))
+                throw new IllegalArgumentException("Selection must be recorded before its analysis");
+            AiAnalysisKey key = new AiAnalysisKey(selectionId, STAGE_1);
+            if (selectedStockAiAnalyses.existsById(key))
+                throw new IllegalStateException("Selection already has Stage-1 analysis");
+            selectedStockAiAnalyses.save(new SelectedStockAiAnalysis(key, analysis.stance(), analysis.thesis(),
+                    analysis.confirmation(), analysis.risk(), analysis.model(), analysis.analysisJson(),
+                    analysis.generatedAt()));
+        });
+    }
+
+    @Override
+    public String evidenceByDomainJson(UUID selectionId) {
+        return transactions.execute(status -> {
+            ObjectNode byDomain = json.createObjectNode();
+            for (EvidenceDomain domain : EvidenceDomain.values()) {
+                ArrayNode items = byDomain.putArray(domain.name());
+                evidenceRows(domain, selectionId).stream()
+                        .sorted(Comparator.comparing(EvidenceRow::fetchedAt).thenComparing(EvidenceRow::source))
+                        .forEach(row -> items.add(evidenceItem(domain, row)));
+            }
+            return write(byDomain);
+        });
+    }
+
+    @Override
     public void recordEvidence(EvidenceSave evidence) {
         EvidenceDomain domain = domain(evidence.domain());
         JsonNode items = readArray(evidence.evidenceJson(), "Evidence JSON");
@@ -241,6 +273,45 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.saveAll(evidenceRows(selectionId, domain, evidence, HistoricalAndPredictiveEvidence::new));
             case MARKET_DEPTH -> marketDepthEvidence.saveAll(evidenceRows(selectionId, domain, evidence, MarketDepthEvidence::new));
             case PRE_OPEN_ANALYSIS -> preOpenAnalysisEvidence.saveAll(evidenceRows(selectionId, domain, evidence, PreOpenAnalysisEvidence::new));
+        }
+    }
+
+    private List<? extends EvidenceRow> evidenceRows(EvidenceDomain domain, UUID selectionId) {
+        return switch (domain) {
+            case MARKET_DATA -> marketDataEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case TECHNICAL_ANALYSIS -> technicalAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case CHART_PATTERNS -> chartPatternsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case FUNDAMENTAL_ANALYSIS -> fundamentalAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case NEWS_AND_SENTIMENT -> newsAndSentimentEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case CORPORATE_ACTIONS -> corporateActionsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case MACRO_AND_ECONOMIC -> macroAndEconomicEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case INSTITUTIONAL_FLOWS -> institutionalFlowsEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case HISTORICAL_AND_PREDICTIVE -> historicalAndPredictiveEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case MARKET_DEPTH -> marketDepthEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+            case PRE_OPEN_ANALYSIS -> preOpenAnalysisEvidence.findByKeySelectionIdAndKeyStage(selectionId, STAGE_1);
+        };
+    }
+
+    /** Rebuilds one provider-evidence item in the envelope's shape, as {@link #recordEvidence} reads it. */
+    private ObjectNode evidenceItem(EvidenceDomain domain, EvidenceRow row) {
+        ObjectNode item = json.createObjectNode();
+        item.put("domain", domain.name());
+        item.put("source", row.source());
+        item.put("role", row.role());
+        item.put("status", row.status());
+        item.put("fetched_at", row.fetchedAt().toString());
+        if (row.payload() == null) item.putNull("payload");
+        else item.set("payload", readAny(row.payload(), "Evidence payload"));
+        if (row.detail() == null) item.putNull("detail");
+        else item.put("detail", row.detail());
+        return item;
+    }
+
+    private JsonNode readAny(String value, String label) {
+        try {
+            return json.readTree(value);
+        } catch (JsonProcessingException failure) {
+            throw new IllegalStateException(label + " is not valid JSON", failure);
         }
     }
 
