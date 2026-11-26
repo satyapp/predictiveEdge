@@ -144,8 +144,8 @@ predictiveedge:
       model: ${PE_OLLAMA_MODEL:qwen3:8b}
       endpoint: ${PE_OLLAMA_ENDPOINT:http://localhost:11434/api/chat}
       timeout-seconds: ${PE_OLLAMA_TIMEOUT_SECONDS:360}
-      context-window-tokens: ${PE_OLLAMA_CONTEXT_WINDOW_TOKENS:8192}
-      maximum-output-tokens: ${PE_OLLAMA_MAXIMUM_OUTPUT_TOKENS:1024}
+      context-window-tokens: ${PE_OLLAMA_CONTEXT_WINDOW_TOKENS:32768}
+      maximum-output-tokens: ${PE_OLLAMA_MAXIMUM_OUTPUT_TOKENS:2048}
     openai:
       api-key: ${OPENAI_API_KEY:}
       model: ${PE_OPENAI_MODEL:gpt-5.4-mini}

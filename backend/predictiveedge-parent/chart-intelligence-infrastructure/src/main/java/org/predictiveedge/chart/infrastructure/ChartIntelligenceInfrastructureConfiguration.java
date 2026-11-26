@@ -145,8 +145,8 @@ public class ChartIntelligenceInfrastructureConfiguration {
             @Value("${predictiveedge.ai.ollama.model:qwen3:8b}") String model,
             @Value("${predictiveedge.ai.ollama.endpoint:http://localhost:11434/api/chat}") URI endpoint,
             @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
-            @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
-            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
+            @Value("${predictiveedge.ai.ollama.context-window-tokens:32768}") int contextTokens,
+            @Value("${predictiveedge.ai.ollama.maximum-output-tokens:2048}") int outputTokens,
             StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies,
             StageOneActivityStore store) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
