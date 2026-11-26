@@ -6,11 +6,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -24,6 +26,8 @@ import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.intelligence.connector.EvidenceDomain;
 import org.predictiveedge.intelligence.connector.EvidenceFetchStatus;
 import org.predictiveedge.intelligence.connector.EvidenceQuery;
+import org.predictiveedge.intelligence.connector.EvidenceRoute;
+import org.predictiveedge.intelligence.connector.EvidenceSource;
 import org.predictiveedge.intelligence.connector.IntelligenceDataConnector;
 import org.predictiveedge.intelligence.connector.IntelligenceSourcePlan;
 import org.predictiveedge.intelligence.connector.ProviderEvidence;
@@ -44,6 +48,9 @@ final class StageOneIntelligenceEvidenceCollector {
     static final String SCHEMA_VERSION = "stage-one-golden-copy-v1";
     static final int DEFAULT_WORKERS_PER_DATA_TYPE = 2;
     static final int COLLATOR_THREADS = 2;
+    /** Domains whose FYERS route is the candle history that the analysis already loads. */
+    private static final Set<EvidenceDomain> REUSABLE_CANDLE_DOMAINS =
+            Set.of(EvidenceDomain.MARKET_DATA, EvidenceDomain.HISTORICAL_AND_PREDICTIVE);
 
     private final IntelligenceDataConnector connector;
     private final ObjectMapper json;
@@ -81,7 +88,18 @@ final class StageOneIntelligenceEvidenceCollector {
 
     /** Fetches every stock in parallel, stores each result in {@code stage}, and returns the collated envelope. */
     ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext, EvidenceStage stage) {
+        return collect(symbols, cutoff, brokerContext, stage, Map.of());
+    }
+
+    /**
+     * As {@link #collect(Collection, Instant, BrokerContext, EvidenceStage)}, but a stock with candles in
+     * {@code analysedSummaries} (keyed by upper-case symbol) gets its FYERS market-data and historical evidence from
+     * that summary, so no source is called for those domains. Other stocks are fetched through the connector as usual.
+     */
+    ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext, EvidenceStage stage,
+            Map<String, ObjectNode> analysedSummaries) {
         Objects.requireNonNull(cutoff, "Evidence cutoff is required");
+        Objects.requireNonNull(analysedSummaries, "Analysed summaries are required");
         Objects.requireNonNull(stage, "Evidence stage is required");
         ObjectNode root = json.createObjectNode();
         root.put("schema_version", SCHEMA_VERSION);
@@ -96,12 +114,12 @@ final class StageOneIntelligenceEvidenceCollector {
                 .toList();
         if (distinct.isEmpty()) return root;
         stage.begin(distinct);
-        runParallel(distinct, cutoff, brokerContext, stage).forEach(stocks::add);
+        runParallel(distinct, cutoff, brokerContext, stage, analysedSummaries).forEach(stocks::add);
         return root;
     }
 
     private List<ObjectNode> runParallel(List<String> symbols, Instant cutoff, BrokerContext brokerContext,
-            EvidenceStage stage) {
+            EvidenceStage stage, Map<String, ObjectNode> analysedSummaries) {
         Map<EvidenceDomain, ExecutorService> groups = new EnumMap<>(EvidenceDomain.class);
         ExecutorService collators = Executors.newFixedThreadPool(COLLATOR_THREADS, threads("stage1-collator"));
         try {
@@ -114,7 +132,8 @@ final class StageOneIntelligenceEvidenceCollector {
                 Map<EvidenceDomain, CompletableFuture<Void>> writes = new EnumMap<>(EvidenceDomain.class);
                 for (EvidenceDomain domain : EvidenceDomain.values()) {
                     writes.put(domain, CompletableFuture.runAsync(
-                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, stage), groups.get(domain)));
+                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, analysedSummaries, stage),
+                            groups.get(domain)));
                 }
                 packages.add(CompletableFuture.allOf(writes.values().toArray(CompletableFuture[]::new))
                         .thenApplyAsync(done -> collate(symbol, stage), collators));
@@ -128,12 +147,41 @@ final class StageOneIntelligenceEvidenceCollector {
     }
 
     private void fetchAndWrite(String symbol, EvidenceDomain domain, Instant cutoff,
-            BrokerContext brokerContext, EvidenceStage stage) {
+            BrokerContext brokerContext, Map<String, ObjectNode> analysedSummaries, EvidenceStage stage) {
         ArrayNode values = json.createArrayNode();
-        connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff, brokerContext, null,
-                        Map.of()))
-                .forEach(value -> values.add(provider(value)));
+        List<ProviderEvidence> results = reusedCandleEvidence(domain, analysedSummaries.get(symbol), cutoff);
+        if (results == null) {
+            results = connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff, brokerContext,
+                    null, Map.of()));
+        }
+        results.forEach(value -> values.add(provider(value)));
         stage.write(symbol, domain, values);
+    }
+
+    /**
+     * Evidence built from candles the analysis already loaded from FYERS, or {@code null} when this domain or these
+     * candles do not allow it. FYERS is the first source for these domains, so the rest of the plan is recorded as
+     * SKIPPED, as the composite does once an earlier source succeeds. {@code fetchedAt} is the evidence cutoff, which
+     * is taken after the analysis loaded the candles. Zerodha gets no request here: it has no lookup of its own yet,
+     * so for stocks without analysed candles it stays UNAVAILABLE.
+     */
+    private static List<ProviderEvidence> reusedCandleEvidence(EvidenceDomain domain, ObjectNode summary,
+            Instant fetchedAt) {
+        if (summary == null || !REUSABLE_CANDLE_DOMAINS.contains(domain)) return null;
+        List<EvidenceRoute> routes = IntelligenceSourcePlan.routesFor(domain).stream()
+                .sorted(Comparator.comparingInt(EvidenceRoute::priority)).toList();
+        if (routes.isEmpty() || routes.get(0).source() != EvidenceSource.FYERS) return null;
+        var results = new ArrayList<ProviderEvidence>();
+        for (int index = 0; index < routes.size(); index++) {
+            EvidenceRoute route = routes.get(index);
+            results.add(index == 0
+                    ? new ProviderEvidence(domain, route.source(), route.role(), EvidenceFetchStatus.SUCCESS,
+                            fetchedAt, summary,
+                            "Session summary built from this run's analysed candles; no extra FYERS call")
+                    : new ProviderEvidence(domain, route.source(), route.role(), EvidenceFetchStatus.SKIPPED,
+                            fetchedAt, null, "Not called: an earlier source returned usable evidence"));
+        }
+        return List.copyOf(results);
     }
 
     /** Waits for every future, then rethrows the first failure with its original type. */

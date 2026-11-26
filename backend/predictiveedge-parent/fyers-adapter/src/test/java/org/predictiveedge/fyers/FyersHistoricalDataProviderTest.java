@@ -34,7 +34,8 @@ class FyersHistoricalDataProviderTest {
         assertThat(sent.uri().getPath()).isEqualTo("/data/history");
         assertThat(sent.uri().getRawQuery()).contains(
                 "symbol=NSE%3AINFY-EQ", "resolution=5", "date_format=0",
-                "range_from=1700000000", "range_to=1700000600", "cont_flag=0", "oi_flag=1");
+                // range_to stops at the previous whole minute, so the minute in progress is never requested.
+                "range_from=1700000000", "range_to=1700000520", "cont_flag=0", "oi_flag=1");
         assertThat(sent.headers().firstValue("Authorization")).contains("APP-100:daily-token");
         assertThat(candles).hasSize(2);
         assertThat(candles.getFirst().close()).isEqualByComparingTo("101.50");

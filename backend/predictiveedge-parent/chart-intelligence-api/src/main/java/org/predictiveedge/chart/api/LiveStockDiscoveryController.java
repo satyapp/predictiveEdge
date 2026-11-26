@@ -95,7 +95,7 @@ public class LiveStockDiscoveryController {
             @Min(1) @Max(20) int maximumCandidates, String setup, String universe,
             String timeframe, String selectedSymbol) {
         public Request {
-            if (historyDays == 0) historyDays = 365;
+            if (historyDays == 0) historyDays = 90;
             if (maximumCandidates == 0) maximumCandidates = 10;
             setup = setup == null ? "" : setup.trim();
             universe = universe == null ? "" : universe.trim();
