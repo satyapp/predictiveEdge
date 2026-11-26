@@ -43,6 +43,10 @@ public class FyersAdapterConfiguration {
             FyersConnectionService connections, FyersHttpClient client) {
         return new FyersHistoricalDataProvider(connections, client);
     }
+    @Bean FyersMarketDepthEvidenceConnector fyersMarketDepthEvidenceConnector(FyersConnectionService connections,
+            FyersHttpClient client) {
+        return new FyersMarketDepthEvidenceConnector(connections, client);
+    }
     @Bean @Primary LiveMarketScreenSource fyersLiveMarketScreenSource(FyersConnectionService connections,
             FyersHttpClient client, ObjectMapper json,
             @Qualifier("nseMcpLiveMarketScreenSource") Optional<LiveMarketScreenSource> fallback) {
