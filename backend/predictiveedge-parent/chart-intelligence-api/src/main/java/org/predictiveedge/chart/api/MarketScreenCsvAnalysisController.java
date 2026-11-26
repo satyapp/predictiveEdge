@@ -31,7 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/chart-intelligence/v1/market-screen-csv-analyses")
 @ConditionalOnBean(MarketScreenCsvAnalysisService.class)
 public class MarketScreenCsvAnalysisController {
-    private static final long MAXIMUM_FILE_BYTES = 2L * 1024 * 1024;
+    private static final long MAXIMUM_FILE_BYTES = 10L * 1024 * 1024;
     private final MarketScreenCsvAnalysisService service;
     private final MarketScreenHistoricalAnalysisService historical;
     private final MarketScreenOllamaAnalysisPort ollama;
@@ -57,7 +57,7 @@ public class MarketScreenCsvAnalysisController {
             @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Market-screen CSV file is required");
         if (file.getSize() > MAXIMUM_FILE_BYTES)
-            throw new IllegalArgumentException("Market-screen CSV file must not exceed 2 MB");
+            throw new IllegalArgumentException("Market-screen CSV file must not exceed 10 MB");
         try {
             String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
             var result = service.analyze(new MarketScreenCsvAnalysisService.Command(screenType, csv, observedAt));
@@ -83,7 +83,7 @@ public class MarketScreenCsvAnalysisController {
             @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Market-screen CSV file is required");
         if (file.getSize() > MAXIMUM_FILE_BYTES)
-            throw new IllegalArgumentException("Market-screen CSV file must not exceed 2 MB");
+            throw new IllegalArgumentException("Market-screen CSV file must not exceed 10 MB");
         try {
             String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
             var deterministic = historical.analyze(new MarketScreenHistoricalAnalysisService.Command(
