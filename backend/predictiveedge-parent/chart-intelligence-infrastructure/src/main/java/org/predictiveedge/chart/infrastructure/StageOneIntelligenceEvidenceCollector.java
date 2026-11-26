@@ -20,7 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.predictiveedge.broker.domain.Candle;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.decision.domain.DecisionResourceType;
 import org.predictiveedge.broker.spi.BrokerContext;
@@ -94,13 +93,13 @@ final class StageOneIntelligenceEvidenceCollector {
 
     /**
      * As {@link #collect(Collection, Instant, BrokerContext, EvidenceStage)}, but a stock with candles in
-     * {@code analysedCandles} (keyed by upper-case symbol) gets its FYERS market-data and historical evidence from those
-     * candles, so no source is called for those domains. Other stocks are fetched through the connector as usual.
+     * {@code analysedSummaries} (keyed by upper-case symbol) gets its FYERS market-data and historical evidence from
+     * that summary, so no source is called for those domains. Other stocks are fetched through the connector as usual.
      */
     ObjectNode collect(Collection<String> symbols, Instant cutoff, BrokerContext brokerContext, EvidenceStage stage,
-            Map<String, List<Candle>> analysedCandles) {
+            Map<String, ObjectNode> analysedSummaries) {
         Objects.requireNonNull(cutoff, "Evidence cutoff is required");
-        Objects.requireNonNull(analysedCandles, "Analysed candles are required");
+        Objects.requireNonNull(analysedSummaries, "Analysed summaries are required");
         Objects.requireNonNull(stage, "Evidence stage is required");
         ObjectNode root = json.createObjectNode();
         root.put("schema_version", SCHEMA_VERSION);
@@ -115,12 +114,12 @@ final class StageOneIntelligenceEvidenceCollector {
                 .toList();
         if (distinct.isEmpty()) return root;
         stage.begin(distinct);
-        runParallel(distinct, cutoff, brokerContext, stage, analysedCandles).forEach(stocks::add);
+        runParallel(distinct, cutoff, brokerContext, stage, analysedSummaries).forEach(stocks::add);
         return root;
     }
 
     private List<ObjectNode> runParallel(List<String> symbols, Instant cutoff, BrokerContext brokerContext,
-            EvidenceStage stage, Map<String, List<Candle>> analysedCandles) {
+            EvidenceStage stage, Map<String, ObjectNode> analysedSummaries) {
         Map<EvidenceDomain, ExecutorService> groups = new EnumMap<>(EvidenceDomain.class);
         ExecutorService collators = Executors.newFixedThreadPool(COLLATOR_THREADS, threads("stage1-collator"));
         try {
@@ -133,7 +132,7 @@ final class StageOneIntelligenceEvidenceCollector {
                 Map<EvidenceDomain, CompletableFuture<Void>> writes = new EnumMap<>(EvidenceDomain.class);
                 for (EvidenceDomain domain : EvidenceDomain.values()) {
                     writes.put(domain, CompletableFuture.runAsync(
-                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, analysedCandles, stage),
+                            () -> fetchAndWrite(symbol, domain, cutoff, brokerContext, analysedSummaries, stage),
                             groups.get(domain)));
                 }
                 packages.add(CompletableFuture.allOf(writes.values().toArray(CompletableFuture[]::new))
@@ -148,9 +147,9 @@ final class StageOneIntelligenceEvidenceCollector {
     }
 
     private void fetchAndWrite(String symbol, EvidenceDomain domain, Instant cutoff,
-            BrokerContext brokerContext, Map<String, List<Candle>> analysedCandles, EvidenceStage stage) {
+            BrokerContext brokerContext, Map<String, ObjectNode> analysedSummaries, EvidenceStage stage) {
         ArrayNode values = json.createArrayNode();
-        List<ProviderEvidence> results = reusedCandleEvidence(domain, analysedCandles.get(symbol), cutoff);
+        List<ProviderEvidence> results = reusedCandleEvidence(domain, analysedSummaries.get(symbol), cutoff);
         if (results == null) {
             results = connector.fetch(domain, new EvidenceQuery(symbol, query(domain, symbol), cutoff, brokerContext,
                     null, Map.of()));
@@ -166,9 +165,9 @@ final class StageOneIntelligenceEvidenceCollector {
      * is taken after the analysis loaded the candles. Zerodha gets no request here: it has no lookup of its own yet,
      * so for stocks without analysed candles it stays UNAVAILABLE.
      */
-    private static List<ProviderEvidence> reusedCandleEvidence(EvidenceDomain domain, List<Candle> candles,
+    private static List<ProviderEvidence> reusedCandleEvidence(EvidenceDomain domain, ObjectNode summary,
             Instant fetchedAt) {
-        if (candles == null || candles.isEmpty() || !REUSABLE_CANDLE_DOMAINS.contains(domain)) return null;
+        if (summary == null || !REUSABLE_CANDLE_DOMAINS.contains(domain)) return null;
         List<EvidenceRoute> routes = IntelligenceSourcePlan.routesFor(domain).stream()
                 .sorted(Comparator.comparingInt(EvidenceRoute::priority)).toList();
         if (routes.isEmpty() || routes.get(0).source() != EvidenceSource.FYERS) return null;
@@ -177,8 +176,8 @@ final class StageOneIntelligenceEvidenceCollector {
             EvidenceRoute route = routes.get(index);
             results.add(index == 0
                     ? new ProviderEvidence(domain, route.source(), route.role(), EvidenceFetchStatus.SUCCESS,
-                            fetchedAt, List.copyOf(candles),
-                            "Candles reused from this run's analysis; no extra FYERS call")
+                            fetchedAt, summary,
+                            "Session summary built from this run's analysed candles; no extra FYERS call")
                     : new ProviderEvidence(domain, route.source(), route.role(), EvidenceFetchStatus.SKIPPED,
                             fetchedAt, null, "Not called: an earlier source returned usable evidence"));
         }

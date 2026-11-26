@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import org.predictiveedge.broker.domain.Candle;
 import org.predictiveedge.broker.spi.BrokerContext;
 import org.predictiveedge.chart.application.MarketScreenHistoricalAnalysisService;
 import org.predictiveedge.chart.application.MarketScreenOllamaAnalysisPort;
@@ -77,13 +76,15 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
         // A saved search gives each selected stock its pre-open row for the trading day as pre-open evidence.
         StageOneIntelligenceEvidenceCollector collector = saved == null ? intelligence
                 : intelligence.withPreOpenRows(store, userId, run.searchId());
-        // The candles each analysed stock already loaded from FYERS are reused as its market-data and historical evidence.
-        Map<String, List<Candle>> analysedCandles = new LinkedHashMap<>();
-        result.analyses().forEach(value -> analysedCandles.put(
-                value.observation().symbol().trim().toUpperCase(Locale.ROOT), value.candles()));
+        // Each analysed stock's FYERS candles, already loaded for the analysis, become a compact intraday summary that
+        // serves as its market-data and historical evidence. The full history never reaches the model.
+        Map<String, ObjectNode> analysedSummaries = new LinkedHashMap<>();
+        result.analyses().forEach(value -> analysedSummaries.put(
+                value.observation().symbol().trim().toUpperCase(Locale.ROOT),
+                IntradaySessionSummary.build(json, value.candles(), result.analyzedAt(), value.assessment())));
         ObjectNode evidence = collector.collect(
                 result.ranking().candidates().stream().map(value -> value.symbol()).toList(),
-                result.analyzedAt(), brokerContext, stage, analysedCandles);
+                result.analyzedAt(), brokerContext, stage, analysedSummaries);
         String evidenceJson = write(compact(result, evidence));
         Map<String, String> expected = new LinkedHashMap<>();
         result.ranking().candidates().forEach(value -> expected.put(value.symbol(), "INSUFFICIENT_EVIDENCE"));

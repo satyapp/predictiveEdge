@@ -167,12 +167,13 @@ class StageOneIntelligenceEvidenceCollectorTest {
     @Test
     void reusesTheCandlesTheAnalysisLoadedInsteadOfCallingAnySourceForThoseDomains() {
         var connector = new RecordingConnector(0);
-        var candles = List.of(new Candle(new Instrument("NSE", "INFY"), CUTOFF, BigDecimal.ONE, BigDecimal.ONE,
-                BigDecimal.ONE, BigDecimal.ONE, 10L, null));
+        var candles = List.of(new Candle(new Instrument("NSE", "INFY"), Instant.parse("2026-11-14T05:50:00Z"),
+                BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 10L, null));
         var json = new ObjectMapper().registerModule(new JavaTimeModule());
+        var summary = IntradaySessionSummary.build(json, candles, CUTOFF, null);
 
         var result = new StageOneIntelligenceEvidenceCollector(connector, json)
-                .collect(List.of("INFY", "TCS"), CUTOFF, null, new InMemoryEvidenceStage(), Map.of("INFY", candles));
+                .collect(List.of("INFY", "TCS"), CUTOFF, null, new InMemoryEvidenceStage(), Map.of("INFY", summary));
 
         assertThat(connector.calls).doesNotContainKeys("INFY:MARKET_DATA", "INFY:HISTORICAL_AND_PREDICTIVE");
         assertThat(connector.calls).containsKeys("TCS:MARKET_DATA", "TCS:HISTORICAL_AND_PREDICTIVE");
@@ -181,7 +182,8 @@ class StageOneIntelligenceEvidenceCollectorTest {
             JsonNode rows = result.at("/stocks/0/evidence_by_domain/" + domain);
             assertThat(rows.get(0).path("source").asText()).isEqualTo("FYERS");
             assertThat(rows.get(0).path("status").asText()).isEqualTo("SUCCESS");
-            assertThat(rows.get(0).path("payload")).hasSize(1);
+            assertThat(rows.get(0).at("/payload/completed_bars").asInt()).isEqualTo(1);
+            assertThat(rows.get(0).at("/payload/bars")).hasSize(1);
             assertThat(rows.findValuesAsText("status")).first().isEqualTo("SUCCESS");
             assertThat(rows.findValuesAsText("status").subList(1, rows.size())).containsOnly("SKIPPED");
         }
