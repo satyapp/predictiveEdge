@@ -71,6 +71,9 @@ public final class PreOpenCsvAnalysisService {
         if (startedAt.isBefore(command.observedAt()))
             throw new IllegalArgumentException("Observation timestamp cannot be in the future");
         var parsed = parser.parse(command.csv(), command.observedAt());
+        // Every parsed row is market data, so it is stored whether or not it is shortlisted.
+        parsed.snapshots().forEach(snapshot -> publications.publish(command.userId(), command.brokerAccountId(),
+                observation(snapshot, command.tradingDate()), startedAt));
         List<PreOpenSnapshot> shortlisted = parsed.snapshots().stream()
                 .filter(PreOpenCsvAnalysisService::passesPreFilter)
                 .sorted(Comparator.comparing(PreOpenSnapshot::auctionTurnover).reversed()
@@ -86,8 +89,6 @@ public final class PreOpenCsvAnalysisService {
                         List.of(new Instrument(snapshot.venue(), snapshot.symbol()))).getFirst();
                 if (resolved.kind() != MarketDataInstrumentKind.EQUITY)
                     throw new IllegalArgumentException("Zerodha instrument is not a cash equity");
-                publications.publish(command.userId(), command.brokerAccountId(),
-                        observation(snapshot, command.tradingDate()), startedAt);
                 List<IntradayHistoricalBar> bars = fetchHistory(context, resolved.instrument(),
                         resolved.providerInstrumentId(), command.analysisCutoff().minus(command.historyWindow()),
                         command.analysisCutoff()).stream()
@@ -113,7 +114,7 @@ public final class PreOpenCsvAnalysisService {
                 command.maximumCandidates());
         return new Result("CANDIDATE_ONLY", startedAt, clock.instant(), parsed.snapshots().size(),
                 parsed.rejectedRows(), shortlisted.size(), List.copyOf(analyses), candidates, ranking,
-                List.copyOf(failures));
+                List.copyOf(failures), List.copyOf(shortlisted));
     }
 
     private List<Candle> fetchHistory(
@@ -188,7 +189,8 @@ public final class PreOpenCsvAnalysisService {
             List<InstrumentAnalysis> analyses,
             List<InstrumentAnalysis> candidates,
             PreOpenCandidateRanker.RankedUniverse ranking,
-            List<InstrumentFailure> failures) { }
+            List<InstrumentFailure> failures,
+            List<PreOpenSnapshot> shortlist) { }
 
     public record InstrumentAnalysis(
             String providerInstrumentId, int historicalBars, IntradaySetupAssessment assessment) { }

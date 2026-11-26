@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.predictiveedge.chart.application.StageOneActivityStore.IntradayListSave;
@@ -18,6 +19,7 @@ import org.predictiveedge.chart.application.StageOneActivityStore.EvidenceSave;
 import org.predictiveedge.chart.application.StageOneActivityStore.StageOneAnalysisInput;
 import org.predictiveedge.chart.domain.MarketScreenObservation;
 import org.predictiveedge.chart.domain.MarketScreenType;
+import org.predictiveedge.chart.domain.PreOpenSnapshot;
 
 class ScreenerRunRecorderTest {
     private static final Instant FETCHED_AT = Instant.parse("2026-11-25T04:10:00Z");
@@ -38,7 +40,7 @@ class ScreenerRunRecorderTest {
         ScreenerSearch saved = store.searches.get(0);
         assertThat(saved.searchId()).isEqualTo(run.searchId());
         assertThat(saved.category()).isEqualTo(SearchEvidenceCategory.TOP_GAINERS);
-        assertThat(saved.screenType()).isEqualTo(MarketScreenType.TOP_GAINERS);
+        assertThat(saved.screenType()).isEqualTo("TOP_GAINERS");
         assertThat(saved.setup()).isEqualTo("breakout");
         assertThat(saved.universe()).isEqualTo("NIFTY");
         assertThat(saved.timeframe()).isEqualTo("5m");
@@ -88,6 +90,31 @@ class ScreenerRunRecorderTest {
                 .isEqualTo(SearchEvidenceCategory.LOWER_CIRCUIT);
         assertThat(SearchEvidenceCategory.forScreen(MarketScreenType.INTRADAY_OPPORTUNITY, rising))
                 .isEqualTo(SearchEvidenceCategory.INTRADAY_SURGE);
+    }
+
+    @Test
+    void savesThePreOpenShortlistAsARunInTheOrderItWasRanked() {
+        var store = new CapturingStore();
+        var first = preOpen("SBIN", "150.00");
+        var second = preOpen("TCS", "3900.00");
+
+        var run = new ScreenerRunRecorder(store).recordPreOpen(USER, "broker-1", TRADING_DATE,
+                List.of(first, second), "{\"historyDays\":365}", snapshot -> "{\"symbol\":\"" + snapshot.symbol() + "\"}",
+                FETCHED_AT);
+
+        ScreenerSearch saved = store.searches.get(0);
+        assertThat(run.category()).isEqualTo(SearchEvidenceCategory.PRE_OPEN);
+        assertThat(saved.category()).isEqualTo(SearchEvidenceCategory.PRE_OPEN);
+        assertThat(saved.screenType()).isEqualTo("PRE_OPEN");
+        assertThat(saved.searchedAt()).isEqualTo(FETCHED_AT);
+        assertThat(saved.rows()).extracting(StageOneActivityStore.ScreenerRow::symbol, StageOneActivityStore.ScreenerRow::screenRank)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("SBIN", 1), org.assertj.core.groups.Tuple.tuple("TCS", 2));
+    }
+
+    private static PreOpenSnapshot preOpen(String symbol, String price) {
+        var value = new BigDecimal(price);
+        return new PreOpenSnapshot("NSE", symbol, "EQ", value, value.add(BigDecimal.ONE), 1_000L,
+                value.multiply(BigDecimal.valueOf(1000)), value, value.add(BigDecimal.ONE), FETCHED_AT);
     }
 
     @Test
@@ -154,6 +181,11 @@ class ScreenerRunRecorderTest {
 
         @Override
         public String evidenceByDomainJson(UUID selectionId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId) {
             throw new UnsupportedOperationException();
         }
     }

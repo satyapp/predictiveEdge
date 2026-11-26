@@ -121,7 +121,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         search.rows().forEach(row -> readObject(row.brokerRowJson(), "Broker row JSON"));
         transactions.executeWithoutResult(status -> {
             searchResults.saveAndFlush(new SearchResult(search.searchId(), search.userId(), search.category().name(),
-                    search.screenType().name(), search.setup(), search.universe(), search.timeframe(),
+                    search.screenType(), search.setup(), search.universe(), search.timeframe(),
                     search.tradingDate(), search.brokerAccountId(), search.criteriaJson(), search.rows().size(),
                     STAGE_1, search.searchedAt()));
             saveScreenerRows(search.category(), search.searchId(), search.searchedAt(), search.rows());
@@ -169,6 +169,14 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
                     analysis.confirmation(), analysis.risk(), analysis.model(), analysis.analysisJson(),
                     analysis.generatedAt()));
         });
+    }
+
+    @Override
+    public Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId) {
+        Map<String, UUID> bySymbol = new HashMap<>();
+        selectedStocks.findBySearchIdAndUserId(searchId, userId)
+                .forEach(selection -> bySymbol.put(selection.getSymbol(), selection.getSelectionId()));
+        return bySymbol;
     }
 
     @Override

@@ -53,7 +53,8 @@ class PreOpenCsvAnalysisServiceTest {
         var result = service.analyze(new PreOpenCsvAnalysisService.Command(UUID.randomUUID(), "ZD123", CSV,
                 LocalDate.of(2026, 11, 9), observedAt, observedAt.plusSeconds(30), Duration.ofDays(365), 10));
 
-        assertThat(publications).hasValue(1);
+        // Both parsed rows are stored as market data, even though only one is shortlisted for history.
+        assertThat(publications).hasValue(2);
         assertThat(historyCalls).hasValue(5);
         assertThat(result.parsedSnapshots()).isEqualTo(2);
         assertThat(result.shortlistedForHistory()).isEqualTo(1);

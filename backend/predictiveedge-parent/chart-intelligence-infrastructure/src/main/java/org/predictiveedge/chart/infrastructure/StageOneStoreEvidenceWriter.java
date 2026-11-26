@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.SearchEvidenceCategory;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneActivityStore.EvidenceSave;
@@ -79,15 +80,30 @@ final class StageOneStoreEvidenceWriter implements EvidenceStage {
         return Map.copyOf(selectionIds);
     }
 
+    /**
+     * Saves each candidate's Stage-1 interpretation against its selection. A candidate without a selection is
+     * skipped. The whole analysis is stored with every candidate, so each row traces back to one model run.
+     */
+    void recordAnalyses(PreOpenOllamaAnalysis analysis) {
+        String analysisJson = write(analysis);
+        for (PreOpenOllamaAnalysis.CandidateInterpretation candidate : analysis.candidates()) {
+            UUID selectionId = selectionIds.get(candidate.symbol());
+            if (selectionId == null) continue;
+            store.recordAnalysis(selectionId, new StageOneActivityStore.StageOneAnalysisInput(candidate.stance(),
+                    candidate.thesis(), candidate.confirmation(), candidate.risk(), analysis.model(),
+                    analysis.generatedAt(), analysisJson));
+        }
+    }
+
     private UUID selectionId(String symbol) {
         UUID selectionId = selectionIds.get(symbol);
         if (selectionId == null) throw new IllegalStateException(symbol + " has no recorded selection");
         return selectionId;
     }
 
-    private String write(ArrayNode evidence) {
+    private String write(Object value) {
         try {
-            return json.writeValueAsString(evidence);
+            return json.writeValueAsString(value);
         } catch (JsonProcessingException failure) {
             throw new IllegalStateException("Evidence could not be serialized", failure);
         }

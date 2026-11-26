@@ -17,6 +17,7 @@ import org.predictiveedge.chart.application.MarketScreenCsvParser;
 import org.predictiveedge.chart.application.MarketScreenCsvParserRegistry;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenCandidateConfirmationService;
+import org.predictiveedge.chart.application.IntradayListRecorder;
 import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.PreOpenIntradayAnalysisService;
@@ -45,6 +46,11 @@ public class ChartIntelligenceInfrastructureConfiguration {
     @Bean
     ScreenerRunRecorder screenerRunRecorder(StageOneActivityStore store) {
         return new ScreenerRunRecorder(store);
+    }
+
+    @Bean
+    IntradayListRecorder intradayListRecorder(StageOneActivityStore store) {
+        return new IntradayListRecorder(store);
     }
 
     @Bean
@@ -153,11 +159,11 @@ public class ChartIntelligenceInfrastructureConfiguration {
             @Value("${predictiveedge.ai.ollama.timeout-seconds:360}") long timeoutSeconds,
             @Value("${predictiveedge.ai.ollama.context-window-tokens:8192}") int contextTokens,
             @Value("${predictiveedge.ai.ollama.maximum-output-tokens:1024}") int outputTokens,
-            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
+            StageOneGoldenCopyFactory goldenCopies, StageOneActivityStore store) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         return new OllamaPreOpenAnalysisAdapter(json,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), endpoint, model,
-                timeout, contextTokens, outputTokens, Clock.systemUTC(), intelligence, goldenCopies);
+                timeout, contextTokens, outputTokens, Clock.systemUTC(), goldenCopies, store);
     }
 
     @Bean

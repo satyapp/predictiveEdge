@@ -5,9 +5,9 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import org.predictiveedge.chart.domain.MarketScreenType;
 
 /**
  * Persists the user's Stage-1 activity: one screener run with every row it returned, the stocks selected from
@@ -27,6 +27,9 @@ public interface StageOneActivityStore {
 
     /** Writes the intraday list. Every selection must belong to the user and already have Stage-1 analysis. */
     void recordIntradayList(IntradayListSave list);
+
+    /** The selections of one search made by one user, keyed by symbol. */
+    Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId);
 
     /**
      * Writes the selected stocks of one screener run without evidence or analysis. Evidence rows reference their
@@ -84,14 +87,15 @@ public interface StageOneActivityStore {
         }
     }
 
-    record ScreenerSearch(UUID searchId, UUID userId, SearchEvidenceCategory category, MarketScreenType screenType,
+    /** {@code screenType} is the screen's name, such as TOP_GAINERS or PRE_OPEN. */
+    record ScreenerSearch(UUID searchId, UUID userId, SearchEvidenceCategory category, String screenType,
             String setup, String universe, String timeframe, LocalDate tradingDate, String brokerAccountId,
             String criteriaJson, Instant searchedAt, List<ScreenerRow> rows) {
         public ScreenerSearch {
             Objects.requireNonNull(searchId, "Search id is required");
             Objects.requireNonNull(userId, "User id is required");
             Objects.requireNonNull(category, "Search category is required");
-            Objects.requireNonNull(screenType, "Screen type is required");
+            screenType = required(screenType, "Screen type");
             Objects.requireNonNull(tradingDate, "Trading date is required");
             Objects.requireNonNull(searchedAt, "Search time is required");
             setup = trimmed(setup);

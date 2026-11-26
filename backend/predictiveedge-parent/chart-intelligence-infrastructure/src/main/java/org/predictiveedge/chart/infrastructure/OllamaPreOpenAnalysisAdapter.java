@@ -19,10 +19,17 @@ import java.util.Objects;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
+import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneAiResult;
 import org.predictiveedge.chart.domain.IntradaySetupAction;
+import org.predictiveedge.chart.domain.PreOpenSnapshot;
+import java.util.UUID;
 
-/** Local Ollama adapter for preliminary interpretation of governed pre-open candidates. */
+/**
+ * Local Ollama adapter for the Stage-1 analysis of stocks selected from the pre-open shortlist. The only evidence
+ * the model sees for a selected stock is that stock's persisted pre-open market data. Nothing else is fetched.
+ */
 public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysisPort {
     private static final String SYSTEM = """
             You are PredictiveEdge's preliminary pre-open analyst. Interpret only the supplied deterministic facts.
@@ -46,12 +53,13 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
     private final int contextTokens;
     private final int outputTokens;
     private final Clock clock;
-    private final StageOneIntelligenceEvidenceCollector intelligence;
     private final StageOneGoldenCopyFactory goldenCopies;
+    private final StageOneActivityStore store;
 
+    /** {@code store} may be null, in which case no run is saved even when the caller names one. */
     public OllamaPreOpenAnalysisAdapter(ObjectMapper json, HttpClient http, URI endpoint, String model,
             Duration timeout, int contextTokens, int outputTokens, Clock clock,
-            StageOneIntelligenceEvidenceCollector intelligence, StageOneGoldenCopyFactory goldenCopies) {
+            StageOneGoldenCopyFactory goldenCopies, StageOneActivityStore store) {
         this.json = Objects.requireNonNull(json);
         this.http = Objects.requireNonNull(http);
         this.endpoint = Objects.requireNonNull(endpoint);
@@ -64,15 +72,24 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
         this.contextTokens = contextTokens;
         this.outputTokens = outputTokens;
         this.clock = Objects.requireNonNull(clock);
-        this.intelligence = Objects.requireNonNull(intelligence);
         this.goldenCopies = Objects.requireNonNull(goldenCopies);
+        this.store = store;
     }
 
     @Override
-    public StageOneAiResult analyze(PreOpenCsvAnalysisService.Result result) {
+    public StageOneAiResult analyze(UUID userId, PreOpenCsvAnalysisService.Result result,
+            ScreenerRunRecorder.ScreenerRun run) {
+        Objects.requireNonNull(userId, "User id is required");
         Objects.requireNonNull(result, "Deterministic result is required");
-        String evidenceJson = write(compact(result));
         Map<String, String> expected = expectedOutcomes(result);
+        StageOneStoreEvidenceWriter saved = run == null || store == null ? null
+                : new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), clock.instant());
+        EvidenceStage stage = saved == null ? new InMemoryEvidenceStage() : saved;
+        Map<String, PreOpenSnapshot> snapshots = new LinkedHashMap<>();
+        result.shortlist().forEach(value -> snapshots.put(value.symbol(), value));
+        ObjectNode evidence = new StageOneIntelligenceEvidenceCollector(new PreOpenEvidenceConnector(snapshots), json)
+                .collect(expected.keySet(), result.completedAt(), null, stage);
+        String evidenceJson = write(compact(result, evidence));
         if (expected.isEmpty()) {
             String overview = result.failures().isEmpty()
                     ? "No stock completed deterministic historical analysis, so Qwen was not invoked."
@@ -117,6 +134,7 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
             content.path("cautions").forEach(value -> cautions.add(value.asText()));
             var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
                     content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
+            if (saved != null) saved.recordAnalyses(analysis);
             return goldenCopies.freeze("PRE_OPEN", evidenceJson, analysis);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
@@ -126,7 +144,7 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
         }
     }
 
-    private ObjectNode compact(PreOpenCsvAnalysisService.Result result) {
+    private ObjectNode compact(PreOpenCsvAnalysisService.Result result, ObjectNode evidence) {
         ObjectNode root = json.createObjectNode();
         root.put("authority", "PRELIMINARY_NOT_FINAL");
         root.put("parsed_snapshots", result.parsedSnapshots());
@@ -158,9 +176,7 @@ public final class OllamaPreOpenAnalysisAdapter implements PreOpenOllamaAnalysis
             node.put("confirmation_rule", assessment.confirmationRule());
             ArrayNode reasons = node.putArray("reasons"); assessment.reasons().forEach(reasons::add);
         });
-        root.set("intelligence_evidence", intelligence.collect(
-                result.analyses().stream().limit(15).map(value -> value.assessment().symbol()).toList(),
-                result.completedAt()));
+        root.set("intelligence_evidence", evidence);
         return root;
     }
 

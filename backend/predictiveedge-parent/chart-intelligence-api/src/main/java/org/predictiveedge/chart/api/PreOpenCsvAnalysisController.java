@@ -12,7 +12,13 @@ import java.time.LocalDate;
 import org.predictiveedge.chart.application.PreOpenCsvAnalysisService;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.PreOpenOllamaAnalysisPort;
+import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneGoldenCopy;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.predictiveedge.identity.application.IdentityService.AuthenticatedIdentity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.MediaType;
@@ -33,12 +39,16 @@ public class PreOpenCsvAnalysisController {
     private final PreOpenCsvAnalysisService service;
     private final PreOpenOllamaAnalysisPort ollama;
     private final AnalysisRunRecorder history;
+    private final ScreenerRunRecorder runs;
+    private final ObjectMapper json;
 
     public PreOpenCsvAnalysisController(PreOpenCsvAnalysisService service, PreOpenOllamaAnalysisPort ollama,
-            AnalysisRunRecorder history) {
+            AnalysisRunRecorder history, ScreenerRunRecorder runs, ObjectMapper json) {
         this.service = service;
         this.ollama = ollama;
         this.history = history;
+        this.runs = runs;
+        this.json = json;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -84,9 +94,12 @@ public class PreOpenCsvAnalysisController {
             var deterministic = service.analyze(new PreOpenCsvAnalysisService.Command(identity.user().id(),
                     brokerAccountId, csv, tradingDate, observedAt,
                     analysisCutoff, Duration.ofDays(historyDays), maximumCandidates));
-            var stageOne = ollama.analyze(deterministic);
+            var run = runs.recordPreOpen(identity.user().id(), brokerAccountId, tradingDate,
+                    deterministic.shortlist(), criteria(brokerAccountId, tradingDate, historyDays, maximumCandidates),
+                    this::serialize, deterministic.startedAt());
+            var stageOne = ollama.analyze(identity.user().id(), deterministic, run);
             var result = new OllamaResponse("PRELIMINARY_NOT_FINAL", deterministic, stageOne.analysis(),
-                    stageOne.goldenCopy());
+                    stageOne.goldenCopy(), run.searchId());
             history.record(identity.user().id(), "PRE_OPEN", "PRE_OPEN_FULL", file.getOriginalFilename(), csv,
                     tradingDate, result.ollama().candidates().size(), result.ollama().model(), result);
             return result;
@@ -95,6 +108,23 @@ public class PreOpenCsvAnalysisController {
         }
     }
 
+    private String criteria(String brokerAccountId, LocalDate tradingDate, int historyDays, int maximumCandidates) {
+        Map<String, Object> criteria = new LinkedHashMap<>();
+        criteria.put("brokerAccountId", brokerAccountId);
+        criteria.put("tradingDate", tradingDate.toString());
+        criteria.put("historyDays", historyDays);
+        criteria.put("maximumCandidates", maximumCandidates);
+        return serialize(criteria);
+    }
+
+    private String serialize(Object value) {
+        try {
+            return json.writeValueAsString(value);
+        } catch (JsonProcessingException failure) {
+            throw new IllegalStateException("Pre-open run could not be persisted", failure);
+        }
+    }
+
     public record OllamaResponse(String authority, PreOpenCsvAnalysisService.Result deterministic,
-            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy) { }
+            PreOpenOllamaAnalysis ollama, StageOneGoldenCopy goldenCopy, UUID searchId) { }
 }

@@ -17,11 +17,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.predictiveedge.broker.spi.BrokerContext;
+import org.predictiveedge.chart.application.IntradayListRecorder;
 import org.predictiveedge.chart.application.MarketScreenDataCopy;
+import org.predictiveedge.chart.application.PreOpenOllamaAnalysis;
 import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneActivityStore.StageOneAnalysisInput;
 import org.predictiveedge.chart.domain.MarketScreenObservation;
+import org.predictiveedge.chart.domain.PreOpenSnapshot;
 import org.predictiveedge.chart.domain.MarketScreenType;
 import org.predictiveedge.chart.infrastructure.persistence.JpaStageOneActivityStore;
 import org.predictiveedge.decision.domain.DecisionResourceType;
@@ -148,6 +151,83 @@ class StageOneRunPersistenceIntegrationTest {
                 "Confirm", "Risk", "qwen3:8b", CUTOFF, "{\"symbol\":\"INFY\"}")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already has Stage-1 analysis");
+    }
+
+    @Test
+    void savesAnIntradayListOfAnalysedSelectionsAndRejectsOthers() throws Exception {
+        var json = new ObjectMapper().findAndRegisterModules();
+        UUID userId = UUID.randomUUID();
+        var copy = new MarketScreenDataCopy(MarketScreenType.TOP_GAINERS, "NSE_MCP", CUTOFF, CUTOFF, "LIVE",
+                List.of(observation("INFY", 1, "3.20"), observation("TCS", 2, "2.10")), List.of());
+        var run = new ScreenerRunRecorder(store).record(userId, "broker-it", TRADING_DATE, copy, "breakout",
+                "NIFTY", "5m", "{}", row -> write(json, row));
+        var stage = new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), CUTOFF);
+        new StageOneIntelligenceEvidenceCollector(new FixedConnector(), json, 2)
+                .collect(List.of("INFY", "TCS"), CUTOFF, null, stage);
+        UUID infy = stage.selectionIds().get("INFY");
+        store.recordAnalysis(infy, new StageOneAnalysisInput("LONG_WATCH", "Trend intact", "Hold the range",
+                "Stop below the low", "qwen3:8b", CUTOFF, "{\"symbol\":\"INFY\"}"));
+        var lists = new IntradayListRecorder(store);
+
+        UUID listId = lists.record(userId, run.searchId(), List.of("infy"), CUTOFF);
+
+        assertThat(count("select count(*) from market_intelligence.intraday_list where list_id = ? and item_count = 1 "
+                + "and stage = 'STAGE_1'", listId)).isEqualTo(1);
+        assertThat(count("select count(*) from market_intelligence.intraday_list_item where list_id = ? "
+                + "and symbol = 'INFY' and selection_id = ?", listId, infy)).isEqualTo(1);
+        assertThatThrownBy(() -> lists.record(userId, run.searchId(), List.of("TCS"), CUTOFF))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TCS has no Stage-1 analysis");
+        assertThatThrownBy(() -> lists.record(userId, run.searchId(), List.of("WIPRO"), CUTOFF))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("was not selected from this search");
+    }
+
+    @Test
+    void savesThePreOpenShortlistAndCollatesOnlyItsPreOpenData() throws Exception {
+        var json = new ObjectMapper().findAndRegisterModules();
+        UUID userId = UUID.randomUUID();
+        var shortlist = List.of(preOpen("SBIN", "800.00"), preOpen("TCS", "3900.00"));
+        var run = new ScreenerRunRecorder(store).recordPreOpen(userId, "broker-it", TRADING_DATE, shortlist,
+                "{\"historyDays\":365}", snapshot -> write(json, PreOpenEvidenceConnector.payload(snapshot)), CUTOFF);
+
+        assertThat(count("select count(*) from market_intelligence.search_result where search_id = ? "
+                + "and category = 'PRE_OPEN' and screen_type = 'PRE_OPEN'", run.searchId())).isEqualTo(1);
+        assertThat(count("select count(*) from market_intelligence.search_result_stock_pre_open where search_id = ?",
+                run.searchId())).isEqualTo(2);
+
+        var connector = new PreOpenEvidenceConnector(Map.of("SBIN", shortlist.get(0), "TCS", shortlist.get(1)));
+        var stage = new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), CUTOFF);
+        var envelope = new StageOneIntelligenceEvidenceCollector(connector, json, 2)
+                .collect(List.of("SBIN", "TCS"), CUTOFF, null, stage);
+
+        assertThat(count("select count(*) from market_intelligence.selected_stock_evidence_pre_open_analysis e "
+                + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
+                + "where s.search_id = ? and e.source = 'NSE' and e.status = 'SUCCESS'", run.searchId()))
+                .isEqualTo(2);
+        assertThat(count("select count(*) from market_intelligence.selected_stock_evidence_market_data e "
+                + "join market_intelligence.selected_stock s on s.selection_id = e.selection_id "
+                + "where s.search_id = ?", run.searchId())).isZero();
+        assertThat(envelope.at("/stocks/0/evidence_by_domain/PRE_OPEN_ANALYSIS/0/payload/kind").asText())
+                .isEqualTo("PRE_OPEN_AUCTION_SNAPSHOT");
+        assertThat(envelope.at("/stocks/1/evidence_by_domain/MARKET_DATA")).isEmpty();
+
+        UUID sbin = stage.selectionIds().get("SBIN");
+        UUID tcs = stage.selectionIds().get("TCS");
+        stage.recordAnalyses(new PreOpenOllamaAnalysis("qwen3:8b", CUTOFF, true, "MIXED", "Two stocks",
+                List.of(new PreOpenOllamaAnalysis.CandidateInterpretation("SBIN", "LONG_WATCH", "Gap held",
+                                "Hold the auction price", "Stop below the open"),
+                        new PreOpenOllamaAnalysis.CandidateInterpretation("TCS", "WAIT", "Gap not confirmed",
+                                "Wait for volume", "Gap may fill")),
+                List.of()));
+        assertThat(count("select count(*) from market_intelligence.selected_stock_ai_analysis where selection_id in (?, ?)",
+                sbin, tcs)).isEqualTo(2);
+    }
+
+    private static PreOpenSnapshot preOpen(String symbol, String price) {
+        BigDecimal value = new BigDecimal(price);
+        return new PreOpenSnapshot("NSE", symbol, "EQ", value, value.add(BigDecimal.ONE), 1_000L,
+                value.multiply(BigDecimal.valueOf(1000)), value, value.add(BigDecimal.ONE), CUTOFF);
     }
 
     private static String write(ObjectMapper json, Object value) {

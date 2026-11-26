@@ -104,24 +104,11 @@ public final class OllamaMarketScreenAnalysisAdapter implements MarketScreenOlla
             var candidates = reconcileCandidates(content, expected, cautions);
             var analysis = new PreOpenOllamaAnalysis(model, clock.instant(), true,
                     content.path("market_tone").asText(), content.path("overview").asText(), candidates, cautions);
-            if (saved != null) recordAnalyses(saved, analysis);
+            if (saved != null) saved.recordAnalyses(analysis);
             return goldenCopies.freeze(result.screenType().name(), evidenceJson, analysis);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt(); throw new IllegalStateException("Ollama analysis was interrupted", failure);
         } catch (IOException failure) { throw new IllegalStateException("Ollama analysis is unavailable", failure); }
-    }
-
-    /** Saves each candidate's interpretation against its selection. Candidates without a selection are skipped. */
-    private void recordAnalyses(StageOneStoreEvidenceWriter saved, PreOpenOllamaAnalysis analysis) {
-        String analysisJson = write(analysis);
-        Map<String, UUID> selections = saved.selectionIds();
-        for (PreOpenOllamaAnalysis.CandidateInterpretation candidate : analysis.candidates()) {
-            UUID selectionId = selections.get(candidate.symbol());
-            if (selectionId == null) continue;
-            store.recordAnalysis(selectionId, new StageOneActivityStore.StageOneAnalysisInput(candidate.stance(),
-                    candidate.thesis(), candidate.confirmation(), candidate.risk(), analysis.model(),
-                    analysis.generatedAt(), analysisJson));
-        }
     }
 
     /** Keeps deterministic identity and direction authoritative without discarding useful model explanations. */

@@ -280,6 +280,11 @@ class StageOneIntelligenceEvidenceCollectorTest {
         }
 
         @Override
+        public Map<String, UUID> selectionIdsBySymbol(UUID userId, UUID searchId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public String evidenceByDomainJson(UUID selectionId) {
             ObjectNode byDomain = new ObjectMapper().createObjectNode();
             for (EvidenceDomain domain : EvidenceDomain.values()) byDomain.putArray(domain.name());

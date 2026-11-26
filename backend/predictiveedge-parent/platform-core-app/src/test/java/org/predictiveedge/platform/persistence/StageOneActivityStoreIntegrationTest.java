@@ -219,7 +219,7 @@ class StageOneActivityStoreIntegrationTest {
 
     private static ScreenerSearch search(UUID userId, UUID searchId, List<ScreenerRow> rows) {
         return new ScreenerSearch(searchId, userId, SearchEvidenceCategory.TOP_GAINERS,
-                MarketScreenType.TOP_GAINERS, "INTRADAY_SURGES", "NSE_EQ", "5m", TRADING_DATE, "account-1",
+                "TOP_GAINERS", "INTRADAY_SURGES", "NSE_EQ", "5m", TRADING_DATE, "account-1",
                 "{\"historyDays\":365}", SEARCHED_AT, rows);
     }
 
