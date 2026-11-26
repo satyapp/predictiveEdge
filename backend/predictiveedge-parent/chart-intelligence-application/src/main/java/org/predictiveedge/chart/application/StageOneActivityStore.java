@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 
 /**
  * Persists the user's Stage-1 activity: one screener run with every row it returned, the stocks selected from
@@ -108,7 +109,12 @@ public interface StageOneActivityStore {
         }
     }
 
-    record ScreenerRow(String symbol, int screenRank, String brokerRowJson) {
+    /** One screener row. {@code preOpenDetail} is set only for PRE_OPEN rows parsed from the NSE pre-open CSV. */
+    record ScreenerRow(String symbol, int screenRank, String brokerRowJson, PreOpenAuctionDetail preOpenDetail) {
+        public ScreenerRow(String symbol, int screenRank, String brokerRowJson) {
+            this(symbol, screenRank, brokerRowJson, null);
+        }
+
         public ScreenerRow {
             symbol = normalizedSymbol(symbol);
             if (screenRank < 1) throw new IllegalArgumentException("Screen rank must be positive");

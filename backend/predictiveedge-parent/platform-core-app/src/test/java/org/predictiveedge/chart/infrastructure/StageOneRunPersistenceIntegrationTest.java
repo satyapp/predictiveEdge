@@ -24,6 +24,7 @@ import org.predictiveedge.chart.application.ScreenerRunRecorder;
 import org.predictiveedge.chart.application.StageOneActivityStore;
 import org.predictiveedge.chart.application.StageOneActivityStore.StageOneAnalysisInput;
 import org.predictiveedge.chart.domain.MarketScreenObservation;
+import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 import org.predictiveedge.chart.domain.PreOpenSnapshot;
 import org.predictiveedge.chart.domain.MarketScreenType;
 import org.predictiveedge.chart.infrastructure.persistence.JpaStageOneActivityStore;
@@ -195,6 +196,10 @@ class StageOneRunPersistenceIntegrationTest {
                 + "and category = 'PRE_OPEN' and screen_type = 'PRE_OPEN'", run.searchId())).isEqualTo(1);
         assertThat(count("select count(*) from market_intelligence.search_result_pre_open where search_id = ?",
                 run.searchId())).isEqualTo(2);
+        assertThat(count("select count(*) from market_intelligence.search_result_pre_open where search_id = ? "
+                + "and prev_close is not null and best_bid_qty = 500 and best_ask_qty = 700 "
+                + "and indicative_equilibrium_qty = 900 and final_volume = 1000 and week_52_low is not null",
+                run.searchId())).isEqualTo(2);
 
         var connector = new PreOpenEvidenceConnector(Map.of("SBIN", shortlist.get(0), "TCS", shortlist.get(1)));
         var stage = new StageOneStoreEvidenceWriter(store, json, run.searchId(), userId, run.category(), CUTOFF);
@@ -226,8 +231,12 @@ class StageOneRunPersistenceIntegrationTest {
 
     private static PreOpenSnapshot preOpen(String symbol, String price) {
         BigDecimal value = new BigDecimal(price);
+        var detail = new PreOpenAuctionDetail(value, value, 500L, value.add(BigDecimal.ONE), 700L,
+                value, 900L, BigDecimal.ONE, BigDecimal.TEN, value.add(BigDecimal.ONE), 1_000L,
+                value.multiply(BigDecimal.valueOf(1000)), BigDecimal.TEN, 10L, 20L,
+                value.add(BigDecimal.TEN), value.subtract(BigDecimal.TEN));
         return new PreOpenSnapshot("NSE", symbol, "EQ", value, value.add(BigDecimal.ONE), 1_000L,
-                value.multiply(BigDecimal.valueOf(1000)), value, value.add(BigDecimal.ONE), CUTOFF);
+                value.multiply(BigDecimal.valueOf(1000)), value, value.add(BigDecimal.ONE), CUTOFF, detail);
     }
 
     private static String write(ObjectMapper json, Object value) {

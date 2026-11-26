@@ -67,7 +67,7 @@ public final class ScreenerRunRecorder {
         for (PreOpenSnapshot snapshot : shortlist) {
             if (!seen.add(snapshot.symbol())) continue;
             rows.add(new StageOneActivityStore.ScreenerRow(snapshot.symbol(), rows.size() + 1,
-                    rowJson.apply(snapshot)));
+                    rowJson.apply(snapshot), snapshot.detail()));
         }
         return save(userId, SearchEvidenceCategory.PRE_OPEN, PRE_OPEN_SCREEN, brokerAccountId, tradingDate, "", "",
                 "", criteriaJson, searchedAt, rows);

@@ -264,7 +264,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case FRESH_BREAKOUTS -> searchResultStockFreshBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockFreshBreakouts::new));
             case NEAR_BREAKOUTS -> searchResultStockNearBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockNearBreakouts::new));
             case TECHNICAL_CROSSOVERS -> searchResultStockTechnicalCrossovers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTechnicalCrossovers::new));
-            case PRE_OPEN -> searchResultPreOpen.saveAll(screenerRows(searchId, createdAt, rows, SearchResultPreOpen::new));
+            case PRE_OPEN -> searchResultPreOpen.saveAll(preOpenRows(searchId, createdAt, rows));
         }
     }
 
@@ -321,6 +321,11 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         } catch (JsonProcessingException failure) {
             throw new IllegalStateException(label + " is not valid JSON", failure);
         }
+    }
+
+    private static List<SearchResultPreOpen> preOpenRows(UUID searchId, Instant createdAt, List<ScreenerRow> rows) {
+        return rows.stream().map(row -> new SearchResultPreOpen(new SearchStockKey(searchId, row.symbol()),
+                row.screenRank(), row.brokerRowJson(), createdAt, row.preOpenDetail())).toList();
     }
 
     private static <T> List<T> screenerRows(UUID searchId, Instant createdAt, List<ScreenerRow> rows,
