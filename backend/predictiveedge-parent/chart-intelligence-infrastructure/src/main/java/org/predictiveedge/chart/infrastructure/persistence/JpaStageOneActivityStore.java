@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -125,7 +126,8 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
                     search.screenType(), search.setup(), search.universe(), search.timeframe(),
                     search.tradingDate(), search.brokerAccountId(), search.criteriaJson(), search.rows().size(),
                     STAGE_1, search.searchedAt()));
-            saveScreenerRows(search.category(), search.searchId(), search.searchedAt(), search.rows());
+            saveScreenerRows(search.category(), search.searchId(), search.tradingDate(), search.searchedAt(),
+                    search.rows());
         });
     }
 
@@ -258,8 +260,8 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         selectedStocks.saveAllAndFlush(selections);
     }
 
-    private void saveScreenerRows(SearchEvidenceCategory category, UUID searchId, Instant createdAt,
-            List<ScreenerRow> rows) {
+    private void saveScreenerRows(SearchEvidenceCategory category, UUID searchId, LocalDate tradingDate,
+            Instant createdAt, List<ScreenerRow> rows) {
         switch (category) {
             case TOP_GAINERS -> searchResultStockTopGainers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTopGainers::new));
             case TOP_LOSERS -> searchResultStockTopLosers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTopLosers::new));
@@ -279,7 +281,7 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
             case FRESH_BREAKOUTS -> searchResultStockFreshBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockFreshBreakouts::new));
             case NEAR_BREAKOUTS -> searchResultStockNearBreakouts.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockNearBreakouts::new));
             case TECHNICAL_CROSSOVERS -> searchResultStockTechnicalCrossovers.saveAll(screenerRows(searchId, createdAt, rows, SearchResultStockTechnicalCrossovers::new));
-            case PRE_OPEN -> searchResultPreOpen.saveAll(preOpenRows(searchId, createdAt, rows));
+            case PRE_OPEN -> searchResultPreOpen.saveAll(preOpenRows(searchId, tradingDate, createdAt, rows));
         }
     }
 
@@ -338,9 +340,10 @@ public final class JpaStageOneActivityStore implements StageOneActivityStore {
         }
     }
 
-    private static List<SearchResultPreOpen> preOpenRows(UUID searchId, Instant createdAt, List<ScreenerRow> rows) {
+    private static List<SearchResultPreOpen> preOpenRows(UUID searchId, LocalDate tradingDate, Instant createdAt,
+            List<ScreenerRow> rows) {
         return rows.stream().map(row -> new SearchResultPreOpen(new SearchStockKey(searchId, row.symbol()),
-                row.screenRank(), row.brokerRowJson(), createdAt, row.preOpenDetail())).toList();
+                tradingDate, row.screenRank(), row.brokerRowJson(), createdAt, row.preOpenDetail())).toList();
     }
 
     private static <T> List<T> screenerRows(UUID searchId, Instant createdAt, List<ScreenerRow> rows,

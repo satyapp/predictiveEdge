@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 
 /**
@@ -14,6 +15,8 @@ import org.predictiveedge.chart.domain.PreOpenAuctionDetail;
 @Entity
 @Table(name = "search_result_pre_open", schema = "market_intelligence")
 public class SearchResultPreOpen extends SearchResultStockRow {
+    @Column(name = "trading_date", nullable = false)
+    private LocalDate tradingDate;
     @Column(name = "prev_close")
     private BigDecimal prevClose;
     @Column(name = "best_bid_price")
@@ -59,9 +62,10 @@ public class SearchResultPreOpen extends SearchResultStockRow {
                 indicativeImbalanceQtyAtMarketOrder, week52High, week52Low);
     }
 
-    public SearchResultPreOpen(SearchStockKey key, int screenRank, String brokerRow, Instant createdAt,
-            PreOpenAuctionDetail detail) {
+    public SearchResultPreOpen(SearchStockKey key, LocalDate tradingDate, int screenRank, String brokerRow,
+            Instant createdAt, PreOpenAuctionDetail detail) {
         super(key, screenRank, brokerRow, createdAt);
+        this.tradingDate = tradingDate;
         if (detail == null) return;
         this.prevClose = detail.previousClose();
         this.bestBidPrice = detail.bestBidPrice();

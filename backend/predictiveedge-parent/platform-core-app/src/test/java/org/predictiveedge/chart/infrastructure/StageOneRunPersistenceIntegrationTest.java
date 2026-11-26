@@ -49,7 +49,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * comes from {@code PREDICTIVEEDGE_TEST_JDBC_URL}, {@code PREDICTIVEEDGE_TEST_JDBC_USER} and
  * {@code PREDICTIVEEDGE_TEST_JDBC_PASSWORD} when set, so it runs on a local server without Docker. Otherwise it starts
  * a PostgreSQL container and is skipped when Docker is unavailable. Hibernate validates every mapping against V001 to
- * V020.
+ * V021.
  */
 class StageOneRunPersistenceIntegrationTest {
     private static final Instant CUTOFF = Instant.parse("2026-11-25T04:10:00Z");
@@ -199,6 +199,11 @@ class StageOneRunPersistenceIntegrationTest {
                 + "and prev_close is not null and best_bid_qty = 500 and best_ask_qty = 700 "
                 + "and indicative_equilibrium_qty = 900 and final_volume = 1000 and week_52_low is not null",
                 run.searchId())).isEqualTo(2);
+        // Each row carries the trading date, so the 90-day lookup can read rows by date and symbol.
+        assertThat(count("select count(*) from market_intelligence.search_result_pre_open where search_id = ? "
+                + "and trading_date = ? and symbol in ('SBIN', 'TCS')", run.searchId(), TRADING_DATE)).isEqualTo(2);
+        assertThat(count("select count(*) from pg_indexes where schemaname = 'market_intelligence' "
+                + "and indexname = 'idx_search_result_pre_open_trading_date_symbol'")).isEqualTo(1);
     }
 
     @Test
